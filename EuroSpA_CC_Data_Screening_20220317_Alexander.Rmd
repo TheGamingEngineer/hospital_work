@@ -1,0 +1,778 @@
+---
+title: "EuroSpA CC Data Screening, script last updated 22 March 2022"
+author: ""
+co- author: "Alexander Kruhøffer Bloch Andersen"
+date: ""
+output: html_document
+---
+
+## 1. Instructions
+
+To run this Rmd file in RStudio:
+
+ - Ensure data files and calculator_basdai.R are placed in the same folder as this Rmd file
+ - Hash out all filenames except one to ensure the desired data file is used
+ - Use "Knit to HTML" to produce html file
+ - Rename the html file by appending
+
+```{r, eval=TRUE, echo=F, fig.height = 10, fig.width = 10}
+if(Sys.info()[7] == "AAND0774"){
+  setwd("C:/Users/AAND0774/Documents/GitHub/eurospa.data_pooling_studya2a3/screening/")
+}else{
+  if(Sys.info()[7] == "simras"){
+  setwd("C:/Users/simras/Documents/GitHub/eurospa.data_pooling_studya2a3/screening/")
+  }else{
+      setwd("C:/Users/AAND0774/Documents/GitHub/eurospa.data_pooling_studya2a3/screening/")
+  }
+}
+
+#import data using readxl package
+library(readxl) #read_excel
+library(writexl) #write_xlsx
+library(parsedate)
+library(formattable)
+#hash out all filenames except one to ensure the desired data file is used
+
+#handling of dates
+cast_dates = function(data){
+  date_variables = c("bio_drug_start_date","bio_drug_stop_date","date_of_last_visit","date_of_first_visit","end_of_follow_up_date","data_cut_date")
+  
+  for (var in date_variables){
+    if(!is.null(eval(parse(text=paste("data","$",var,sep=""))))){
+      data[,var] = parse_date(data[,var])
+    }
+  }
+  return(data)
+}
+
+
+#filename <- "../datasets/CZ/data_cz_20220315_v5.txt"
+#metadata = "../datasets/CZ/metadata_cz_20220223_v2.xlsx"
+
+#filename <- "../datasets/CZ/data_cz_20220315_v5.txt"
+#metadata = "../datasets/CZ/metadata_cz_20220223_v2.xlsx"
+
+#filename <- "../datasets/FI/study_A2_A3_Finland_6.4_version_8.0.txt"
+#metadata = "../datasets/FI/metadata_master_raw_study_A2_A3 _Finland_28.3_version_5.0_SHR.xlsx"
+
+
+#filename <- "../datasets/PT/data_PT_20220212_v7.txt"
+#metadata = "../datasets/PT/metadata_PT_20220212_v3.xlsx"
+
+#filename <- "../datasets/SI/data_si_20220217_v8.txt"
+#metadata = "../datasets/SI/metadata_SI_study_A2_A3_20220217_version_2.2.xlsx"
+
+#filename <- "../datasets/CH/data_switzerland_20220201_1.txt"
+#metadata = "../datasets/CH/metadata_switzerland_20220201_1.xlsx"
+
+#filename <- "../datasets/NO/data_NORWAY_20220423_7.txt"
+#metadata = "../datasets/NO/metadata_master_raw_study_A2_A3 version_NORWAY.xlsx"
+
+#filename <- "../datasets/SE/data_Sweden_11052021_v1.txt"
+#metadata = "../datasets/SE/metadata_Sweden_18032021_v2.xlsx"
+
+#filename = paste("../datasets/UK/data_UK_140422_v6.txt",sep="")
+#metadata = paste("../datasets/UK/metadata_UK_140422_version_4.0.xlsx",sep="")
+
+#filename = paste("../datasets/","ES/biobad_eurospa_apr29v5.txt",sep="")
+#metadata <- paste("../datasets/","metadata_ES_study_A2_A3_v1_20220419.xlsx",sep="")
+
+filename = paste("../datasets/","ET/Estonia_22.03.1.txt",sep="")
+metadata <- paste("../datasets/","ET/metadata_master_raw_study_A2_A3 version_2.xlsx",sep="")
+
+#filename = paste("../datasets/","SF/study_A2_A3_Finland_28.4_version_9.0.txt",sep="")
+#metadata <- paste("../datasets/","SF/metadata_master_raw_study_A2_A3 _Finland_28.4_version_6.0.xlsx",sep="")
+
+#filename <- "../datasets/PT/metadata_PT_20210314_v3.txt"
+#metadata = "../datasets/PT/20210302_metadata_master_raw_studyA1.xlsx"
+
+#filename <- "../datasets/RO/data_romania_20220313_v2.txt"
+#metadata = "../datasets/RO/metadata_romania_20220113_v3.xlsx"
+
+#filename <- "../datasets/IS/bdmards_dt_merge_washed_IS_20220502.csv"
+#metadata = "../datasets/IS/metadata_master_is_raw_study_A2_A3_v1_0.xlsx"
+
+#filename <- "../datasets/DK/bdmards_dt_merge_washed_DK_20220502.csv"
+#metadata = "../datasets/DK/metadata_master_dk_raw_study_A2_A3_v1_0.xlsx"
+
+#filename <- "../datasets/IT/data_italy_20220409_3.txt"
+#metadata = "../datasets/IT/metadata_master_raw_study_A2_A3 version_1.0_Italy_20220408_v1.0.xlsx"
+
+#filename <- "../datasets/NO/data_NORWAY_20220425_10.txt"
+#metadata = "../datasets/NO/metadata_master_raw_study_A2_A3 version_NORWAY.xlsx"
+
+#filename = paste("../datasets/","ES/data_ES_20210905.txt",sep="")
+#metadata <- paste("../datasets/","ES/metadata_ES_studyA1_v2.xlsx",sep="")
+
+#filename = paste("../datasets/","NL/data_NL_06052021_v2.1.txt",sep="")
+#metadata = paste("../datasets/","NL/metadata_NL_22032021_studyA1_v1.5.xlsx",sep="")
+
+#filename <- "../datasets/TR//bdmards_dt_merge_washed_TR_20210724.csv"
+#metadata = "../datasets/TR/metadata_TR_20210224_v4nsk.xlsx"
+
+#filename <- "../datasets/IT/20210923_data_ver9.txt"
+#metadata = "../datasets/IT/20210302_metadata_master_raw_studyA1_20210524.xlsx"
+
+#filename <- "../datasets/IS/bdmards_dt_merge_washed_IS_20210724.csv"
+#metadata = "../datasets/IS/metadata_IS_20210224_v4nsk.xlsx"
+
+#filename <- "../datasets/DK/bdmards_dt_merge_washed_DK_20220127.txt"
+
+#filename <- "../datasets/SI/data_si_20220217_v4.txt"
+
+
+#md <- read_excel(metadata)
+
+d <- read.table(filename,header=T,sep = "\t")                                               # data reading plan A
+#d <- as.data.frame(read.csv(filename,sep = "\t",header=TRUE,na.strings=c("NA","NaN", ""))) # data reading plan B
+
+
+d = cast_dates(d)
+#print(head(d))
+#print to html
+
+print(paste("File name:       ", filename))
+print(paste("System time:     ", Sys.time()))
+print(paste("Country:         ", unique(d$country)))
+
+
+#handling of basdai
+
+#this is a practical way for scaling range to be 0 to 10, in case it is supplied as 0 to 100, based on observed max value
+#a more robust solution might be to import metadata and use range as specified in metadata
+
+#if("basdai_1_fatigue" %in% colnames(d)){
+#  if(max(d$basdai_1_fatigue, na.rm = TRUE) > 10) {d$basdai_1_fatigue <- d$basdai_1_fatigue/10}
+#}
+
+#if("basdai_2_pain_spinal" %in% colnames(d)){
+#if(max(d$basdai_2_pain_spinal, na.rm = TRUE) > 10) {d$basdai_2_pain_spinal <- d$basdai_2_pain_spinal/10}
+#}
+
+#if("basdai_3_pain_joints" %in% colnames(d)){
+#if(max(d$basdai_3_pain_joints, na.rm = TRUE) > 10) {d$basdai_3_pain_joints <- d$basdai_3_pain_joints/10}
+#}
+
+#if("basdai_4_tender" %in% colnames(d)){
+#if(max(d$basdai_4_tender, na.rm = TRUE) > 10) {d$basdai_4_tender <- d$basdai_4_tender/10}
+#}
+
+#if("basdai_5_stiffness_severity" %in% colnames(d)){
+#if(max(d$basdai_5_stiffness_severity, na.rm = TRUE) > 10) {d$basdai_5_stiffness_severity <- d$basdai_5_stiffness_severity/10}
+#}
+
+#if("basdai_6_stiffness_duration" %in% colnames(d)){
+#if(max(d$basdai_6_stiffness_duration, na.rm = TRUE) > 10) {d$basdai_6_stiffness_duration <- d$basdai_6_stiffness_duration/10}
+#}
+
+if("basdai" %in% colnames(d)){
+  if(max(d$basdai, na.rm = TRUE) > 10) {
+    d$basdai <- d$basdai/10
+  }
+}
+
+#calculate basdai_out
+
+#source("calculator_basdai.R")
+
+#d$basdai_out <- NA
+
+#if(all(c("basdai_1_fatigue", "basdai_2_pain_spinal", "basdai_3_pain_joints",
+#         "basdai_4_tender", "basdai_5_stiffness_severity", "basdai_6_stiffness_duration") %in% colnames(d))){
+#  d$basdai_out <- calculator_basdai(
+#  d$basdai_1_fatigue,
+#  d$basdai_2_pain_spinal,
+#  d$basdai_3_pain_joints,
+#  d$basdai_4_tender,
+#  d$basdai_5_stiffness_severity,
+#  d$basdai_6_stiffness_duration)
+#}
+
+#check for basdai inconsistencies
+
+#if("basdai" %in% colnames(d) & !all(is.na(d$basdai_out))){
+#  plot(d$basdai, d$basdai_out, main = "Check for inconsistencies between basdai items and basdai")
+#  abline(b = 1, lty = 2)
+
+#basdai_inconsistencies <- (d[round(d$basdai, 1) != round(d$basdai_out, 1) & !is.na(d$basdai) & !is.na(d$basdai_out),
+#        c("row_id", "basdai_1_fatigue", "basdai_2_pain_spinal", "basdai_3_pain_joints",
+#          "basdai_4_tender", "basdai_5_stiffness_severity", "basdai_6_stiffness_duration", "basdai_out", "basdai")])
+#colnames(basdai_inconsistencies)[2:7] <- c("item1", "item2", "item3", "item4", "item5", "item6")
+#options(tibble.print_max = Inf)
+#basdai_inconsistencies$diff <- round(abs(basdai_inconsistencies$basdai_out - basdai_inconsistencies$basdai),2)
+#basdai_inconsistencies <- basdai_inconsistencies[order(basdai_inconsistencies$diff, decreasing = TRUE),]
+#basdai_inconsistencies
+
+#}
+
+#use basdai_out to overwrite any existing basdai values where basdai_out has a value different from NA
+#this is a practical fix for handling the situation where some rows may have "basdai" but not individual items,
+#while other rows may have individual items (these rows may or may not also have "basdai")
+
+#if(!("basdai" %in% colnames(d))) {
+#  d$basdai <- NA
+#}
+
+#if("basdai_out" %in% colnames(d)){
+#  d$basdai[!is.na(d$basdai_out)] <- d$basdai_out[!is.na(d$basdai_out)]
+#}
+  
+#ensure weeks_delta_to_baseline is numeric to allow plotting
+# overwite patient IDs
+old_pids = d$patient_id
+num_patients = length(unique(d$patient_id))
+new_patient_ids = sample(x=1:num_patients,size=num_patients)
+i = 1
+for(pid in unique(old_pids)){
+  d$patient_id[old_pids == pid] <- new_patient_ids[i]
+  i = i + 1
+}
+
+d$weeks_delta_to_baseline <- as.numeric(d$weeks_delta_to_baseline)
+d<-d[d$weeks_delta_to_baseline>-15,]
+```
+
+## 2. Descriptives
+
+```{r, eval=TRUE, echo=TRUE}
+
+Hmisc::describe(d)
+
+```
+
+## 3. bio_drug_start_date for patients with only one row of data
+
+```{r, eval=TRUE, echo=TRUE}
+
+unique_ids <- unique(d$patient_id)
+nrows_per_unique_ids <- rep(NA, length(unique_ids))
+for(i in 1:length(unique_ids)){
+  sub <- d[d$patient_id == unique_ids[i],]
+  nrows_per_unique_ids[i] <- nrow(sub)
+}
+one_row_patients <- unique_ids[nrows_per_unique_ids == 1]
+sort(d$bio_drug_start_date[d$patient_id %in% one_row_patients])
+
+```
+
+## 4.Variable constistency between xray-sacroiliitis and hla_b27 variables
+```{r,eval=TRUE,echo=TRUE}
+if(!is.null(d$new_york_criteria_4ab_xray_sacroiliitis) && !is.null(d$asas_criteria_13_xray_sacroiliitis)){
+gmodels::CrossTable(d$new_york_criteria_4ab_xray_sacroiliitis,d$asas_criteria_13_xray_sacroiliitis,missing.include=FALSE,prop.c=FALSE,prop.r=FALSE,prop.chisq=FALSE,format="SPSS",dnn=c("New York Criteria 4ab: X-ray sacroiliitis","ASAS Criteria 13: X-ray sacroiliitis"),percent = (format == "SPSS"))
+}else {if(is.null(d$new_york_criteria_4ab_xray_sacroiliitis)){print("New York Criteria 4ab not provided")}
+      if(is.null(d$asas_criteria_13_xray_sacroiliitis)){print("ASAS Criteria 13 not provided")}
+    }
+
+if(!is.null(d$hla_b27) && !is.null(d$asas_criteria_10_hla_b27)){
+gmodels::CrossTable(d$hla_b27,d$asas_criteria_10_hla_b27,missing.include=FALSE,prop.c=FALSE,prop.r=FALSE,prop.chisq=FALSE,format="SPSS",dnn=c("hla_b27","ASAS Criteria 10: hla_b27"),percent = (format == "SPSS"))
+}else{if(is.null(d$hla_b27)){print("hla_b27 not provided")}
+      if(is.null(d$asas_criteria_10_hla_b27)){print("ASAS Criteria 10 not provided")}
+    }
+
+
+```
+
+## 5. Number of rows per patient and treatment series
+
+```{r, eval=TRUE, echo=TRUE}
+
+#table of rows per patient, all treatment series
+
+table(table(d$patient_id))
+
+#table of rows per patient, restricted to 1st treatment series
+
+table(table(d$patient_id[d$bio_drug_series_number == 1]))
+
+#table of rows per patient, restricted to 2nd treatment series
+
+table(table(d$patient_id[d$bio_drug_series_number == 2]))
+
+#table of rows per patient, restricted to 3rd treatment series
+
+table(table(d$patient_id[d$bio_drug_series_number == 3]))
+
+#table of rows per patient, restricted to 4th treatment series
+
+table(table(d$patient_id[d$bio_drug_series_number == 4]))
+
+#table of rows per patient, restricted to 5th treatment series
+
+table(table(d$patient_id[d$bio_drug_series_number == 5]))
+
+```
+
+## 6. Longitudinal plots of visits for 1st, 2nd and 3rd treatment series, sample of up to 100 patients
+
+```{r, eval=TRUE, echo=TRUE, fig.height = 15, fig.width = 6}
+
+for(i in 1:3){
+  set.seed(123)
+  unique_ids <- unique(d$patient_id[d$bio_drug_series_number == i & as.Date(d$bio_drug_start_date) > as.Date("2014-12-31")])
+  n <- min(100, length(unique_ids))
+  sample_patient_ids <- sample(unique_ids, n) #sample up to 100 patients (if less than 100 patients are available, choose all)
+  d_sub <- d[d$bio_drug_series_number == i & d$patient_id %in% sample_patient_ids,]
+  stripchart(d_sub$weeks_delta_to_baseline ~ d_sub$patient_id,
+           axes = FALSE, main = paste0("BIO DRUG SERIES ", i, ", WEEKS DELTA TO BASELINE\nSAMPLE OF UP TO 100 PATIENTS"))
+  
+  ### adds red points to mark bio_drug_stop_date in comparison to weeks_delta_to_baseline
+  d_sub$bio_drug_weeks_delta_to_baseline=difftime(strptime(d_sub$bio_drug_stop_date,format="%Y%m%d"),
+                                                  strptime(d_sub$bio_drug_start_date,format="%Y%m%d"),units="weeks")
+  if(is.na(unique(d_sub$bio_drug_weeks_delta_to_baseline))){
+    d_sub$bio_drug_weeks_delta_to_baseline=difftime(as.Date(d_sub$bio_drug_stop_date),
+                                                    as.Date(d_sub$bio_drug_start_date),units="weeks")}
+  d_sub$bio_drug_weeks_delta_to_baseline[is.na(d_sub$bio_drug_weeks_delta_to_baseline)] = Inf
+  stripchart(d_sub$bio_drug_weeks_delta_to_baseline ~ d_sub$patient_id, col="red", add=TRUE,  pch=19)
+  
+  ## make a list of ID with bio_drug_series_numbers equal from i to make points for end_of_follow_up_date and date_of_last_visit
+  keep_id<-c()
+  for(pid in unique_ids){
+    if(length(unique(d$bio_drug_series_number[d$patient_id==pid]))==i){
+      keep_id<-c(keep_id,pid)
+    }
+  }
+  
+  ### adds blue crosses to mark end_of_follow_up_date in comparison to weeks_delta_to_baseline
+  if("end_of_follow_up_date" %in% colnames(d_sub)){
+    d_sub$ending_follow_up_weeks_delta_to_baseline=difftime(as.Date(d_sub$end_of_follow_up_date),as.Date(d_sub$bio_drug_start_date),units="weeks")
+  
+  
+  d_sub$ending_follow_up_weeks_delta_to_baseline[is.na(d_sub$ending_follow_up_weeks_delta_to_baseline) | 
+                                                   !(d_sub$patient_id %in% keep_id)] = Inf
+  stripchart(d_sub$ending_follow_up_weeks_delta_to_baseline ~ d_sub$patient_id, col="blue", add=TRUE,  pch=4, lwd=2)
+  }
+  ### adds green triangles to mark date_of_last_visit in comparison to weeks_delta_to_baseline
+  if("date_of_last_visit" %in% colnames(d_sub)){
+    d_sub$last_visit_weeks_delta_to_baseline=difftime(as.Date(d_sub$date_of_last_visit),as.Date(d_sub$bio_drug_start_date),units="weeks")
+  
+  
+  d_sub$last_visit_weeks_delta_to_baseline[is.na(d_sub$last_visit_weeks_delta_to_baseline) | 
+                                                   !(d_sub$patient_id %in% keep_id)] = Inf
+  stripchart(d_sub$last_visit_weeks_delta_to_baseline ~ d_sub$patient_id, col="green", add=TRUE,  pch=2, lwd=2)
+  }
+  axis(1, at = c(0, 26, 52, 104))
+  abline(v = 0, lty = 2, col = "red")
+  abline(h = 1:n)
+  
+  ### variable description
+  points(10,0,pch=0,col="black")
+  text(25,0,label=":visit")
+  points(90,0,pch=19,col="red")
+  text(115,0,label=":End of current treatment")
+  if("end_of_follow_up_date" %in% colnames(d_sub)){
+  points(10,-2,pch=4,lwd=2,col="blue")
+  text(25,-2,label=":Final end of Follow up")}
+  if("date_of_last_visit" %in% colnames(d_sub)){
+  points(90,-2,pch=2,lwd=2,col="green")
+  text(115,-2,label=":last visit")}
+}
+
+```
+
+## 7. Longitudinal plot of C-reactive protein (CRP) for 1st treatment series, sample up to 500 patients
+
+```{r, eval=TRUE, echo=TRUE, fig.height = 15, fig.width = 15}
+
+if("crp" %in% colnames(d)){
+
+#for bio drug series number 1, sample up to 500 patient ids, plot crp longitudinally
+
+unique_ids <- unique(d$patient_id[d$bio_drug_series_number == 1])
+n <- min(500, length(unique_ids))
+sample_patient_ids <- sample(unique_ids, n) #sample up to 500 patients (if less than 500 are available, choose all)
+d_sub <- d[d$bio_drug_series_number == 1 & d$patient_id %in% sample_patient_ids,]
+d_sub <- d_sub[order(d_sub$weeks_delta_to_baseline),]
+d_sub <- d_sub[order(d_sub$patient_id),]
+plot(0, type = "n", axes = FALSE, xlim = c(-15, 130), ylim = c(0, 100),
+     xlab = "weeks_delta_to_baseline", ylab = "crp")
+for(i in 1:length(sample_patient_ids)){
+  lines(d_sub$crp[d_sub$patient_id == sample_patient_ids[i]] ~
+          d_sub$weeks_delta_to_baseline[d_sub$patient_id == sample_patient_ids[i]],
+        col = scales::alpha("blue", 0.1), lwd = 5)
+}
+axis(1, at = c(0, 26, 52, 104))
+axis(2, at = c(0, 25, 50, 75, 100))
+abline(v = 0, lty = 2, col = "red")
+
+}
+
+```
+
+
+## 8. Longitudinal plot of BASDAI for 1st treatment series, sample up to 500 patients
+
+```{r, eval=TRUE, echo=TRUE, fig.height = 15, fig.width = 15}
+
+if("basdai" %in% colnames(d)){
+
+unique_ids <- unique(d$patient_id[d$bio_drug_series_number == 1])
+n <- min(500, length(unique_ids))
+sample_patient_ids <- sample(unique_ids, n) #sample up to 500 patients (if less than 500 are available, choose all)
+d_sub <- d[d$bio_drug_series_number == 1 & d$patient_id %in% sample_patient_ids,]
+d_sub <- d_sub[order(d_sub$weeks_delta_to_baseline),]
+d_sub <- d_sub[order(d_sub$patient_id),]
+plot(0, type = "n", axes = FALSE, xlim = c(-15, 130), ylim = c(0, 10),
+     xlab = "weeks_delta_to_baseline", ylab = "basdai")
+for(i in 1:length(sample_patient_ids)){
+  lines(d_sub$basdai[d_sub$patient_id == sample_patient_ids[i]] ~
+          d_sub$weeks_delta_to_baseline[d_sub$patient_id == sample_patient_ids[i]],
+        col = scales::alpha("blue", 0.1), lwd = 5)
+}
+axis(1, at = c(0, 26, 52, 104))
+axis(2, at = c(0, 5, 10))
+abline(v = 0, lty = 2, col = "red")
+
+}
+
+```
+
+
+## 9. Longitudinal plot of tender_joints_28 for 1st treatment series, sample up to 500 patients
+
+```{r, eval=TRUE, echo=TRUE, fig.height = 15, fig.width = 15}
+
+if("tender_joints_28" %in% colnames(d)){
+  
+unique_ids <- unique(d$patient_id[d$bio_drug_series_number == 1])
+n <- min(500, length(unique_ids))
+sample_patient_ids <- sample(unique_ids, n) #sample up to 500 patients (if less than 500 are available, choose all)
+d_sub <- d[d$bio_drug_series_number == 1 & d$patient_id %in% sample_patient_ids,]
+d_sub <- d_sub[order(d_sub$weeks_delta_to_baseline),]
+d_sub <- d_sub[order(d_sub$patient_id),]
+plot(0, type = "n", axes = FALSE, xlim = c(-15, 130), ylim = c(0, 28),
+     xlab = "weeks_delta_to_baseline", ylab = "tender_joints_28")
+for(i in 1:length(sample_patient_ids)){
+  lines(d_sub$tender_joints_28[d_sub$patient_id == sample_patient_ids[i]] ~
+          d_sub$weeks_delta_to_baseline[d_sub$patient_id == sample_patient_ids[i]],
+        col = scales::alpha("blue", 0.1), lwd = 5)
+}
+axis(1, at = c(0, 26, 52, 104))
+axis(2, at = c(0, 5, 10, 28))
+abline(v = 0, lty = 2, col = "red")
+
+}
+
+```
+
+
+
+
+## 10. Precision of bDMARDs dosis and application interval 
+```{r, eval=TRUE, echo=FALSE, fig.height = 15, fig.width = 15}
+# extract the unique bio drug names for which drug standards have been given
+drug_names=c("abatacept","adalimumab","apremilast","baricitinib","certolizumab","etanercept","golimumab","guselkumab","infliximab","ixekizumab","rituximab","secukinumab","tocilizumab","tofacitinib","upadacitinib","ustekinumab")
+
+final_names=c()
+
+dosematch=c()
+intervalmatch=c()
+
+dosevariansmatch=c()
+intervalvariansmatch=c()
+
+# looping over data to check bio_drug_dosing_interval and bio_drug_dose
+for(name in drug_names){
+  #create subset of data from drugnames
+  sub<-d[d$bio_drug_name == name,]
+  dose_issue <- 0
+  dose_varians_issue <- 0
+  
+  interval_issue <- 0
+  interval_varians_issue <- 0
+  
+  #loop across subset
+  for(i in 1:nrow(sub)){
+    
+    #select standard to be used based on diagnosis group
+    if(is.na(sub[i,"diagnosis_group"])){
+      #print(paste0("patient ",sub[i,"patient_id"]," have not been diagnosed with neither AxSpA nor SpA"))
+      if(is.na(sub[i,"patient_id"])){
+        break
+      }
+      # skip iteration, if no diagnosis group have been given
+      next 
+    }else{
+      diagnosis <- sub[i,"diagnosis_group"]
+    }
+    
+    amount=as.numeric(sub[i,"bio_drug_dose"])
+    treat=sub[i,"bio_drug_dosing_interval"]
+    
+    if(name=="abatacept"){
+      if(diagnosis=="psa"){
+        if(!(is.na(sub[i,"weight"]))){
+          if(!(is.na(sub[i,"weight"])) && as.integer(sub[i,"weight"])<60){
+            dose=c(125,500)
+          }else if(!(is.na(sub[i,"weight"])) && as.integer(sub[i,"weight"])>=60 | as.integer(sub[i,"weight"])<=100){
+            dose=c(125,750)
+          }else if(!(is.na(sub[i,"weight"])) && as.integer(sub[i,"weight"])>100){
+            dose=c(125,1000)
+          }
+        }else{
+          dose=c(125,500,750,1000)
+        }  
+        interval=c(1,14,28)
+      }
+    }else if(name=="adalimumab"){
+     dose=40
+     interval=14 
+    }else if(name=="apremilast"){
+      if(diagnosis=="psa"){
+        if(sub[i,"weeks_delta_to_baseline"]==0){
+          dose=c(10,20,30,40,50,60)
+          interval=c(1,2,3,4,5,6)
+        }else{
+          dose=c(30,60)
+          interval=1
+        }
+      }else{
+        dose_issue=dose_issue+1
+        interval_issue=interval_issue+1
+        next
+      }
+    }else if(name=="baricitinib"){
+      dose=c(2,4)
+      interval=1
+    }else if(name=="certolizumab"){
+      if(diagnosis=="spa"){
+        if(sub[i,"weeks_delta_to_baseline"]==0){
+          dose=400
+          interval=c(1,14,28)
+        }else if(sub[i,"weeks_delta_to_baseline"]>=2){
+          dose=200
+          interval=14
+        }else if(sub[i,"weeks_delta_to_baseline"]>=4){
+          dose=400
+          interval=28
+        }
+      }else if(diagnosis=="psa"){
+        if(sub[i,"weeks_delta_to_baseline"]==0){
+          dose=400
+          interval=c(1,14,28)
+        }else{
+          dose=200
+          interval=14
+        }
+      }
+    }else if(name=="etanercept"){
+      dose=c(25,50)
+      interval=c(2,3,7)
+    }else if(name=="golimumab"){
+      if(!is.na(sub[i,"weight"]) && sub[i,"weight"]>100){
+        dose=100
+      }else{
+        dose=50
+      }
+      interval=28
+    }else if(name=="guselkumab"){
+      if(diagnosis=="psa"){
+        dose=100
+        if(sub[i,"weeks_delta_to_baseline"]==0){
+          interval=c(1,28)
+        }else{
+          interval=c(28,56)
+        }
+      }else{
+        dose_issue=dose_issue+1
+        interval_issue=interval_issue+1
+        next
+      }
+    }else if(name == "infliximab"){
+      if(!is.na(sub[i,"bio_drug_dose"]) && !is.na(sub[i,"weight"])){
+        dose=5 
+        }
+        if(diagnosis=="psa"){
+          interval=c(1,14,42)
+        }else if(diagnosis=="spa" || diagnosis=="axspa"){
+          interval=c(1,14,42,56)
+        }
+    }else if(name=="ixekizumab"){
+      if(diagnosis=="psa"){
+        if(sub[i,"weeks_delta_to_baseline"]==0){
+          dose=160
+          interval=1
+        }else{
+          dose=80
+          interval=c(14,28,42,56,70,84)
+        }
+      }else{
+        dose_issue=dose_issue+1
+        interval_issue=interval_issue+1
+        next
+      }
+    }else if(name=="rituximab"){
+      if(sub[i,"weeks_delta_to_baseline"]==0){
+        dose=seq(500,1000)
+        interval=c(1,15)
+      }else{
+        dose=1000
+        interval=seq(182,365)
+      }
+    }else if(name=="secukinumab"){
+      if(sub[i,"weeks_delta_to_baseline"]==0){
+        interval=c(1,7,14,21,28)
+      }else{
+        interval=28
+      }
+      if(diagnosis=="spa"){
+        dose=150
+      }else if(diagnosis=="psa"){
+        dose=c(150,300)
+      }
+    }else if(name=="tocilizumab"){
+      dose=162
+      interval=c(7,14)
+    }else if(name=="tofacitinib"){
+      dose=c(5,10)
+      interval=1
+    }else if(name=="upadacitinib"){
+      dose=15
+      interval=1
+    }else if(name=="ustekinumab"){
+      if(diagnosis=="psa"){
+        if(!(is.na(sub[i,"weight"])) && sub[i,"weight"]<100){
+          dose=45
+        }else if(!(is.na(sub[i,"weight"])) && sub[i,"weight"]>=100){
+          dose=90
+        }else{
+          dose_issue=dose_issue+1
+          interval_issue=interval_issue+1
+          next
+        }
+        if(sub[i,"weeks_delta_to_baseline"]==0){
+          interval=c(1,28)
+        }else{
+          interval=84
+        }
+      }else{
+        dose_issue=dose_issue+1
+        interval_issue=interval_issue+1
+        next
+      }
+    }
+    
+    # check if drug is not part of the standard
+    if(!(sub[i,"bio_drug_name"] %in% drug_names)){
+      next
+    }
+    
+    
+    
+    
+    if(name=="infliximab"){
+      if(!is.na(sub[i,"weight"])){
+        data_dose=as.integer(sub[i,"bio_drug_dose"]/sub[i,"weight"])
+      }
+    }else{
+      data_dose=sub[i,"bio_drug_dose"]
+    }
+    strike=0
+    varians_strike=0
+    for(j in 1:length(dose)){
+      if(!(data_dose %in% dose[j])){
+        strike=strike+1
+      }
+      if(!(data_dose %in% seq(dose[j]*0.9,dose[j]*1.1,0.1))){
+        varians_strike=varians_strike+1
+      }
+      if(data_dose %in% dose[j] || data_dose %in% seq(dose[j]*0.9,dose[j]*1.1,0.1)){
+        dose_pos=which(dose==sub[i,"bio_drug_dose"])
+      }
+      if(strike==length(dose)){
+        dose_issue=dose_issue+1
+      }
+      if(varians_strike==length(dose)){
+        dose_varians_issue=dose_varians_issue+1
+      }
+    }
+    
+    data_interval=sub[i,"bio_drug_dosing_interval"]
+    strike=0
+    varians_strike=0
+    
+    if(!(is.na(data_interval))){
+      if(length(dose)==length(interval) && length(dose_pos)!=0){
+          if(is.na(interval[dose_pos]) || !(data_interval %in% interval[dose_pos])){
+            interval_issue=interval_issue+1
+          }
+          if(is.na(interval[dose_pos]) || !(data_interval %in% seq(interval[dose_pos]-7,interval[dose_pos]+7))){
+            interval_varians_issue=interval_varians_issue+1
+          }
+      }else{
+        for(j in 1:length(interval)){
+
+          if(!(interval[j] %in% data_interval)){
+            strike=strike+1
+          }
+          if(!(data_interval %in% seq(interval[j]-7,interval[j]+7))){
+            varians_strike=varians_strike+1
+          }
+          if(strike==length(interval)){
+            interval_issue=interval_issue+1
+          }
+          if(varians_strike==length(interval)){
+            interval_varians_issue=interval_varians_issue+1
+          }
+        }
+      }
+    }  
+  }  
+
+  if(name %in% unique(d$bio_drug_name)){
+    dose_match=length(sub$patient_id) - dose_issue
+    interval_match=length(sub$patient_id) - interval_issue 
+  
+    dose_match_percent=dose_match/length(sub$patient_id)*100
+    interval_match_percent=interval_match/length(sub$patient_id)*100
+
+    dose_varians_match=length(sub$patient_id) - dose_varians_issue
+    interval_varians_match=length(sub$patient_id) - interval_varians_issue
+  
+    dose_varians_percent = dose_varians_match/length(sub$patient_id)*100
+    interval_varians_percent = interval_varians_match/length(sub$patient_id)*100
+
+    final_dose_match=paste(dose_match," (",round(dose_match_percent,3),"%)")
+    final_interval_match=paste(interval_match," (",round(interval_match_percent,3),"%)")
+  
+    final_dose_varians_match = paste(dose_varians_match," (",round(dose_varians_percent,3),"%)")
+    final_interval_varins_match = paste(interval_varians_match," (",round(interval_varians_percent,3),"%)")
+  
+    dosematch <- append(dosematch,final_dose_match)
+    intervalmatch <-append(intervalmatch,final_interval_match)
+  
+    dosevariansmatch <- append(dosevariansmatch,final_dose_varians_match)
+    intervalvariansmatch <- append(intervalvariansmatch,final_interval_varins_match)
+    
+    final_names <- append(final_names,name)
+    
+  }
+}
+
+
+df<-data.frame(drugs=final_names,
+               DoseMatch=dosematch,
+               DoseVarians=dosevariansmatch,
+               IntervalMatch=intervalmatch,
+               IntervalVariansMatch=intervalvariansmatch)
+colnames(df)<-c("bDMARDS",
+                "dosis match <n(%)>",
+                "dosis match +/-10% <n(%)>",
+                "interval match <n(%)>",
+                "interval match +/- 7 days <n(%)>")
+
+formattable(df)
+
+
+```
+
+
+
+
+
+## 11. Further ideas for screening that may be considered at a later stage
+
+ - Transform data to one row = one treatment series per patient, 'transformed data', note that this requires careful selection of baseline visit and follow-up visit using certain time periods and completeness considerations, calculated using bio_drug_start_date as "key" variable (required for next step). Pool data from all countries, 'pooled data'
+ - mice::md.pattern applied to 'transformed data'
+ - Compare 'pooled data' across countries by using various plots
+
+

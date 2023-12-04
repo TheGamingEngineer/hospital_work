@@ -3,12 +3,12 @@ title: "UPA_single_dump_analysis_DK_2023-08-18"
 author: "Alexander K. B. Andersen"
 output: html_document
 ---
+
 ```{r,eval=TRUE,echo=FALSE}
 print(paste("Time and date of screening:",Sys.time()))
 ```
 
 ## Introduction
-
 
 ```{r setup, include=F}
 
@@ -31,25 +31,57 @@ library(parsedate)
 library(formattable)
 library(stringr)
 library(tibble)
+library(lubridate)
 library("ggplot2")
 library("plyr")
 
-metadata=read_excel("~/GitHub/upa_data_dump/UPA_metadata_KFV.xlsx")
+parse_new_dates = function(date_var){
+  date_translate = list()
+  date_translate["JAN"] = "01"
+  date_translate["FEB"] = "02"
+  date_translate["MAR"] = "03"
+  date_translate["APR"] = "04"
+  date_translate["MAY"] = "05"
+  date_translate["JUN"] = "06"
+  date_translate["JUL"] = "07"
+  date_translate["AUG"] = "08"
+  date_translate["SEP"] = "09"
+  date_translate["OCT"] = "10"
+  date_translate["NOV"] = "11"
+  date_translate["DEC"] = "12"
+  date_translate["   "] = "  "
+  
+  date_var[date_var ==""] = "         "
+  
+  date_mat = as.data.frame(t(matrix(unlist(strsplit(split = "",x=date_var)),nrow=9)))
 
-new_path = "~/GitHub/upa_data_dump/dump/UPA_data_20230816/"
+  days = apply(date_mat[,1:2],1,FUN=function(x){paste(x,collapse="")})
+  months = apply(data.frame(apply(date_mat[,3:5],1,FUN=function(x){paste(x,collapse="")})),1,FUN=function(x) {as.character(date_translate[x])})
+  years = apply(date_mat[,6:9],1,FUN=function(x){paste(x,collapse="")})
 
+  out = apply(cbind(years,months,days),1,FUN=function(x){paste(x,collapse="-")})
+  out[out == "    -  -  "] = NA
 
-pat="drk_patient.csv"
-pre="drk_prescription.csv"
-
-if(include_SAE==TRUE){
-  sae="drk_seriousadverseevent.csv"
+  return(as.Date(out))
 }
 
-visit="drk_visit.csv"
-yearly="drk_yearly.csv"
+metadata=read_excel("~/GitHub/upa_data_dump/UPA_metadata_KFV.xlsx")
+
+new_path = "~/GitHub/upa_data_dump/dump/UPA_20231010/"
+
+
+pat="drk_patient_full.csv"
+pre="drk_prescription_full.csv"
+
+if(include_SAE==TRUE){
+  sae="drk_seriousadverseevent_full.csv"
+}
+population="drk_population_full.csv"
+visit="drk_visit_full.csv"
+yearly="drk_yearly_full.csv"
 
 pat_new = read.table(paste(new_path,pat,sep=""),sep=",",header=T)
+pop_new = read.table(paste(new_path,population,sep=""),sep=",",header=T)
 d_new_pre = read.table(paste(new_path,pre,sep=""),sep=",",header=T)
 d_new_sae = read.table(paste(new_path, sae,sep=""),header = T,sep = ",")
 d_new_visit = read.table(paste(new_path,visit,sep=""),header = T,sep = ",")
@@ -100,10 +132,33 @@ colnames(tmp)<-c("Unique_patient_id_danbio","registrationdate")
 
 d_new_sae<-merge(d_new_sae,tmp,by="Unique_patient_id_danbio")
 
+#################################################
+# Adjust CPR (CPR is apparently imported as integer, which removes the first digit, if the first digit is 0)
+pat_new$CPR<-as.character(pat_new$CPR)
+pat_new$CPR=ifelse(nchar(pat_new$CPR)<10,paste0("0",pat_new$CPR),pat_new$CPR)
+pop_new$CPR<-as.character(pop_new$CPR)
+pop_new$CPR=ifelse(nchar(pop_new$CPR)<10,paste0("0",pop_new$CPR),pop_new$CPR)
+
 ##################################################
 # convert dates into date
 pat_new$Diagnosis_date = as.Date(parse_date(pat_new$Diagnosis_date))
 pat_new$statusdiscontinuedateuserdecided = as.Date(parse_date(pat_new$statusdiscontinuedateuserdecided))
+
+pop_new$Diagnosis_date = parse_new_dates(pop_new$Diagnosis_date)
+pop_new$diag_year = parse_new_dates(pop_new$diag_year)
+pop_new$CPR_status_dato = parse_new_dates(pop_new$CPR_status_dato)
+pop_new$Max_visit = parse_new_dates(pop_new$Max_visit)
+pop_new$Kontroldato_RA = parse_new_dates(pop_new$Kontroldato_RA)
+pop_new$Kontroldato_SpA = parse_new_dates(pop_new$Kontroldato_SpA)
+pop_new$Basmi_date = parse_new_dates(pop_new$Basmi_date)
+pop_new$Xray_date_RA = parse_new_dates(pop_new$Xray_date_RA)
+pop_new$Xray_columna_date = parse_new_dates(pop_new$Xray_columna_date)
+pop_new$MR_columna_date = parse_new_dates(pop_new$MR_columna_date)
+pop_new$Xray_sacro_joint_date = parse_new_dates(pop_new$Xray_sacro_joint_date)
+pop_new$MR_sacro_joint_date = parse_new_dates(pop_new$MR_sacro_joint_date)
+pop_new$DXA_scanning_date = parse_new_dates(pop_new$DXA_scanning_date)
+pop_new$DAS_joints_RA_date = parse_new_dates(pop_new$DAS_joints_RA_date)
+pop_new$CRP_date = parse_new_dates(pop_new$CRP_date)
 
 d_new_sae$registrationdate = as.Date(parse_date(d_new_sae$registrationdate))
 d_new_sae$Sae_start_date = as.Date(parse_date(d_new_sae$Sae_start_date))
@@ -150,6 +205,7 @@ d_new_yearly<-merge(d_new_yearly,cpr_to_id,by="Unique_patient_id_danbio")
 ```{r,eval=TRUE,echo=FALSE}
 if(iceland==FALSE){
   print(paste("patient level file used:",new_path,pat,sep=""))
+  print(paste("population level file used:",new_path,population,sep=""))
   print(paste("treatment level file used:",new_path,pre,sep=""))
   print(paste("SAE level file used:",new_path, sae,sep=""))
   print(paste("visit level file used:",new_path,visit,sep=""))
@@ -157,8 +213,8 @@ if(iceland==FALSE){
 }
 ```
 
-
 ## 1 diagnosis
+
 ```{r,eval=TRUE,echo=F}
 
 #(drugstartdate >= 20190101 | is.na(drugstopdate) |  drugstopdate >= 20190101)
@@ -176,6 +232,7 @@ drugs = unique(c(d_new_pre$Prescription[startsWith(d_new_pre$Prescription,'BIOLO
 ```
 
 ## 2. Period of registration for each variable
+
 ```{r, eval=TRUE, echo=F, fig.height = 15, fig.width = 10}
 if(iceland){
   options(warn=-1)
@@ -198,6 +255,25 @@ rownames(out_tab) = unique(vars)
 
 print("Patient table")
 print(out_tab[!(rownames(out_tab) %in% c("inclusiondate","inclusiondate_int")),])
+
+# Population table
+periode_start = c()
+periode_stop = c()
+vars = c()
+
+pop_new$max_visit_int = as.numeric(format(pop_new$Max_visit,format="%Y%m%d"))
+for(var in setdiff(colnames(pop_new),c("X"))){
+  
+  periode_start = c(periode_start, as.character(as.Date(as.character(min(pop_new$max_visit_int[!is.na(pop_new[,var])],na.rm=T)),format = "%Y%m%d")))
+  periode_stop = c(periode_stop,   as.character(as.Date(as.character(max(pop_new$max_visit_int[!is.na(pop_new[,var])],na.rm=T)),format = "%Y%m%d")))
+  vars = c(vars,var)
+}
+
+out_tab = data.frame(periode_start,periode_stop)
+rownames(out_tab) = unique(vars)
+
+print("Population table")
+print(out_tab[!(rownames(out_tab) %in% c("Max_visit","max_visit_int")),])
 
 # Treatment table
 periode_start = c()
@@ -261,7 +337,7 @@ print(out_tab[!(rownames(out_tab) %in% c("registrationdate","registration_date_i
 periode_start = c()
 periode_stop = c()
 vars = c()
-d_new_yearly$generalstatusdate_int = as.numeric(format(d_new_yearly$generalstatusdate,format="%Y%m%d"))
+d_new_yearly$generalstatusdate_int = as.integer(gsub("-","",as.character(d_new_yearly$Year_of_status)))
 for(var in setdiff(colnames(d_new_yearly),c("X"))){
   
   periode_start = c(periode_start, as.character(as.Date(as.character(min(d_new_yearly$generalstatusdate_int[!is.na(d_new_yearly[,var])],na.rm=T)),format = "%Y%m%d")))
@@ -278,7 +354,23 @@ print(out_tab[!(rownames(out_tab) %in% c("generalstatusdate","generalstatusdate_
 
 
 ```
-## 3. Period of registration per drug
+
+## 3. CPR-status overview
+```{r, eval=TRUE, echo=F, fig.height = 15, fig.width = 10}
+CPR_status=pop_new$CPR_status
+CPR_status[CPR_status=="20"]<-"inaktiv, men tildelt personnummer"
+CPR_status[CPR_status=="30"]<-"annulleret personnummer"
+CPR_status[CPR_status=="50"]<-"slettet personnummer ved dobbeltnummer"
+CPR_status[CPR_status=="60"]<-"ændret personnummer ved ændring af fødselsår"
+CPR_status[CPR_status=="70"]<-"forsvundet"
+CPR_status[CPR_status=="80"]<-"udrejst"
+CPR_status[CPR_status=="90"]<-"død"
+
+print(data.frame(table(CPR_status[CPR_status!="."])))
+```
+
+
+## 4. Period of registration per drug
 ```{r, eval=TRUE, echo=F, fig.height = 15, fig.width = 10}
 # New visit table
 periode_start = c()
@@ -286,7 +378,7 @@ periode_stop = c()
 vars = c()
 
 d_new_pre$registration_date_int = as.numeric(format(d_new_pre$registrationdate,format="%Y%m%d"))
-for(drug in unique(d_new_pre$drugname)){
+for(drug in unique(d_new_pre$Prescription)){
   
   periode_start = c(periode_start, as.character(as.Date(as.character(min(d_new_pre$registration_date_int[(d_new_pre$Prescription == drug)],na.rm=T)),format = "%Y%m%d")))
   periode_stop = c(periode_stop,   as.character(as.Date(as.character(max(d_new_pre$registration_date_int[(d_new_pre$Prescription == drug)],na.rm=T)),format = "%Y%m%d")))
@@ -302,42 +394,50 @@ print(out_tab)
 
 ```
 
-## 4. Estimated data cut date.
+## 5. Estimated data cut date.
+
 ```{r,eval=TRUE,echo=F}
 
 if(include_SAE==TRUE){
-  df <- data.frame(a1 = c(as.character(max(as.numeric(format(pat_new$inclusiondate,          format="%Y%m%d")),na.rm = T)),
-                          as.character(max(as.numeric(format(d_new_pre$registrationdate,     format="%Y%m%d")),na.rm = T)),
-                          as.character(max(as.numeric(format(d_new_yearly$Year_of_status, format="%Y%m%d")),na.rm = T)),
-                          as.character(max(as.numeric(format(d_new_visit$Visit_date,          format="%Y%m%d")),na.rm = T)),
-                          as.character(max(as.numeric(format(d_new_sae$registrationdate,     format="%Y%m%d")),na.rm = T))))
+  df <- data.frame(a1 = c(as.character(max(pat_new$inclusiondate_int,na.rm = T)),
+                          as.character(max(pop_new$max_visit_int,na.rm = T)),
+                          as.character(max(d_new_pre$registration_date_int,na.rm = T)),
+                          as.character(max(d_new_yearly$generalstatusdate_int,na.rm = T)),
+                          as.character(max(d_new_visit$visitdate_int,na.rm = T)),
+                          as.character(max(d_new_sae$registration_date_int,na.rm = T))))
 
   df = t(df)
-  colnames(df)<-c("Patient table","Treatment table","Yearly table","Visit table","SAE table")
+  colnames(df)<-c("Patient table","Population table","Treatment table","Yearly table","Visit table","SAE table")
 }else{
-  df <- data.frame(a1 = c(as.character(max(as.numeric(format(pat_new$inclusiondate,          format="%Y%m%d")),na.rm = T)),
-                          as.character(max(as.numeric(format(d_new_pre$registrationdate,     format="%Y%m%d")),na.rm = T)),
-                          as.character(max(as.numeric(format(d_new_yearly$Year_of_status, format="%Y%m%d")),na.rm = T)),
-                          as.character(max(as.numeric(format(d_new_visit$Visit_date,          format="%Y%m%d")),na.rm = T))))
+  df <- data.frame(a1 = c(as.character(max(pat_new$inclusiondate_int,na.rm = T)),
+                          as.character(max(pop_new$max_visit_int,na.rm = T)),
+                          as.character(max(d_new_pre$registration_date_int,na.rm = T)),
+                          as.character(max(d_new_yearly$generalstatusdate_int,na.rm = T)),
+                          as.character(max(d_new_visit$visitdate_int,na.rm = T))))
 
   df = t(df)
-  colnames(df)<-c("Patient table","Treatment table","Yearly table","Visit table")
+  colnames(df)<-c("Patient table","Population table","Treatment table","Yearly table","Visit table")
 }
+
 
 rownames(df)<-c("dump")
 print(df)
 
 ```
-## 5.ID counts.
+
+## 6.ID counts.
+
 ```{r, eval=TRUE, echo=F}
 ## gather CPR nr. and ID's
 CPR<-unique(pat_new$CPR)
 pat_id<-unique(pat_new$Unique_patient_id_danbio)
 hos_id<-unique(pat_new$hospital_id_danbio)
 sae_id<-unique(d_new_sae$Unique_sae_id)
+d_new_pre$unique_prescription_id=paste0(d_new_pre$CPR,"_",d_new_pre$Prescription,"_",d_new_pre$Prescription_start_date)
+pre_id<-unique(d_new_pre$unique_prescription_id)
 
-df<-data.frame(c(length(CPR),length(pat_id),length(hos_id),length(sae_id)))
-rownames(df)<- c("CPR nr.","Unique_patient_id_danbio","hospital_id_danbio","Unique_sae_id")
+df<-data.frame(c(length(CPR),length(pat_id),length(hos_id),length(sae_id),length(pre_id)))
+rownames(df)<- c("CPR nr.","Unique_patient_id_danbio","hospital_id_danbio","Unique_sae_id","unique_prescription_id")
 
 
 #if(include_SAE==TRUE){
@@ -356,11 +456,12 @@ formattable(df)
 
 ```
 
-## 6. Treatment counts
+## 7. Treatment counts
+
 ```{r, eval=TRUE, echo=F, fig.height = 15, fig.width = 10}
 d_new_pre_old = d_new_pre
 
-d_new_pre = unique(d_new_pre[,c("Unique_patient_id_danbio","Prescription","Prescription_start_date","registrationdate")])
+d_new_pre = unique(d_new_pre[,c("Unique_patient_id_danbio","Prescription","Prescription_start_date","Prescription_stop_date","registrationdate","CPR")])
 
 # fixing drug vocabulary
 d_new_pre[c("drugtype","drug_name","misc")] = str_split_fixed(d_new_pre$Prescription,"_",3)
@@ -429,8 +530,8 @@ formattable(df_new_type)
 
 ```
 
+### 8. Hospital ID overview.
 
-### 7. Hospital ID overview. 
 ```{r, eval=TRUE, echo=F, fig.height = 15, fig.width = 10}
 # for patients
 hos_id=data.frame(table(pat_new$hospital_id))
@@ -463,3 +564,177 @@ if("hospital_id" %in% colnames(d_new_pre_old) && length(d_new_pre_old$hospital_i
 formattable(HOS_ID_final)
 
 ```
+
+## 9. drugstartdates by drugtypes
+
+```{r, eval=TRUE, echo=F, fig.width = 15}
+
+drugtypes=unique(d_new_pre$drugtype)
+
+for(x in drugtypes){
+  if(!(x %in% c("NON-BIOLOGIC","NODRUG","MEDICINE","FLURBIPROFEN"))){
+    temp<-d_new_pre[d_new_pre$drugtype==x,]
+    temp<-temp[grepl("(start|_)date",colnames(temp))]
+    
+    values<-na.omit(temp[,1])
+    #values<-values[values>as.Date("1800-01-01")]
+  
+    HIST<-hist(values,breaks="years",format="%Y-%m",main=paste(x," (amount:",nrow(temp),")"),xlab=" ",freq=TRUE,las=2)
+  }
+}
+
+
+```
+
+## 10. variable completeness (in percentage)
+
+```{r, eval=TRUE, echo=F, fig.width = 15}
+longest=max(length(colnames(pat_new)),
+            length(colnames(pop_new)),
+            length(colnames(d_new_pre)),
+            length(colnames(d_new_sae)),
+            length(colnames(d_new_visit)),
+            length(colnames(d_new_yearly)))
+
+completeness<-function(df,n){
+  out=c()
+  for(x in colnames(df)){
+    percent=as.character(round((sum(!(is.na(df[x])))/nrow(df)) * 100,3))
+    entry=paste0(x,": ",percent,"%")
+    out=append(out,entry)
+  }
+  out=c(out,rep(NA,n-length(out)))
+  return(out)
+}
+
+complete_df=data.frame("patient"=completeness(pat_new,longest),
+                       "population"=completeness(pop_new,longest),
+                       "Prescription"=completeness(d_new_pre,longest),
+                       "SAE"=completeness(d_new_sae,longest),
+                       "Visit"=completeness(d_new_visit,longest),
+                       "Yearly"=completeness(d_new_yearly,longest))
+formattable(complete_df)
+```
+
+### 11a. patient data based on diagnosis group
+```{r, eval=TRUE, echo=F, fig.height = 15, fig.width = 10}
+pat_new$diagnosis_group<-NA
+# defining diagnosis groups
+### RA-diagnoses ###
+RA<-c("DIAGNOSIS_M05_9","DIAGNOSIS_M06_0","DIAGNOSIS_M06_9")
+### PSA-diagnoses ###
+PSA<-c("DIAGNOSIS_M07_3_A","DIAGNOSIS_M07_3_B")
+### AS-diagnoses ###
+AS<-c("DIAGNOSIS_M45_9","DIAGNOSIS_M45_9_H20_0","DIAGNOSIS_M45_9_M02_9",
+      "DIAGNOSIS_M45_9_M07_2","DIAGNOSIS_M45_9_M07_4","DIAGNOSIS_M45_9_M07_5")
+### sacroiliitis diagnoses ###
+SAC<-c("DIAGNOSIS_M46_1")
+### AxSPA-diagnoses ###
+axspa<-c("DIAGNOSIS_M46_8_H20_0","DIAGNOSIS_M46_8_M02_9","DIAGNOSIS_M46_8_M07_2",
+         "DIAGNOSIS_M46_8_M07_3","DIAGNOSIS_ M46_8_M07_4","DIAGNOSIS_M46_8_M07_4_7_5",
+         "DIAGNOSIS_M46_8_M07_5")
+
+other<-c("DIAGNOSIS_M13_0","DIAGNOSIS_M46_8_H20_0","DIAGNOSIS_M46_8_M02_9",
+         "DIAGNOSIS_M46_8_M07_2","DIAGNOSIS_M46_8_M07_3","DIAGNOSIS_M46_8_M07_4",
+         "DIAGNOSIS_M46_8_M07_4_7_5","DIAGNOSIS_M46_8_M07_5","DIAGNOSIS_M46_9")
+
+pat_new$diagnosis_group[pat_new$Diagnosis %in% RA]<-"RA"
+pat_new$diagnosis_group[pat_new$Diagnosis %in% PSA]<-"PSA"
+pat_new$diagnosis_group[pat_new$Diagnosis %in% AS]<-"AS"
+pat_new$diagnosis_group[pat_new$Diagnosis %in% axspa]<-"AxSPA"
+pat_new$diagnosis_group[pat_new$Diagnosis %in% SAC]<-"SACROILIITIS"
+pat_new$diagnosis_group[pat_new$Diagnosis %in% other]<-"OTHER"
+
+## calculates patient age
+date_pat=pat_new[,cols<-c("CPR","Unique_patient_id_danbio")]
+### exrtact birth dates from CPR
+date_pat$birth_day=str_extract(pat_new$CPR,"[0-9]{6}")
+date_pat[c("birth_date","birth_year")] = c(str_extract(date_pat$birth_day,"[0-9]{4}"),
+                                            str_extract(date_pat$birth_day,"[0-9]{2}$"))
+### we assume that a patient is no more than 100 years old, so the 5-6 digits that are higher than the 3-4 digit of the data-cut-date is considered to be from the 1900's 
+date_pat$birth_year=ifelse(date_pat$birth_year>as.integer(substr(format(data_cut_1,"%Y"),3,4)),
+                           as.integer(paste0("19",date_pat$birth_year)),
+                           as.integer(paste0("20",date_pat$birth_year)))
+date_pat$birth_day=as.Date(paste0(date_pat$birth_date,date_pat$birth_year),format="%d%m%Y")
+date_pat$age=as.integer(time_length(difftime(data_cut_1,date_pat$birth_day),"years"))
+pat_new=merge(pat_new,date_pat[,c("Unique_patient_id_danbio","age")],by="Unique_patient_id_danbio")
+
+### if the calculated age is less than the recorded age at diagnosis, it might be an error in CPR 
+#### and will be adjusted for by taking the age at diagnosis and adding the years from diagnosis date to data_cut_date
+pat_new$age=ifelse(!(is.na(pat_new$Age_at_diagnosis)) && pat_new$age<pat_new$Age_at_diagnosis,
+                   pat_new$Age_at_diagnosis+as.integer(time_length(difftime(data_cut_1,pat_new$Diagnosis_date),"years")),
+                   pat_new$age)
+
+
+if(!("gender" %in% colnames(pat_new))){
+  pat_new$gender=ifelse(as.integer(substr(pat_new$CPR,nchar(pat_new$CPR),nchar(pat_new$CPR))) %% 2 == 0, "FEMALE","MALE")
+}
+
+cats<-append(c("Gender"),unique(pat_new$gender))
+cats<-append(cats,c("Age-groups","0-17","18-30","31-40","41-50","51-60","61-70","71-80","81+"))
+cats<-append(cats,append(c("status discont. reasons"),unique(pat_new[,cols<-grep("statusdiscontinuereason",colnames(pat_new))])))
+pat_df=data.frame(cats)
+
+for(diag in unique(pat_new$diagnosis_group)){
+  temp_df=pat_new[pat_new$diagnosis_group == diag,]
+  pat_df[,diag]<-NA
+  
+  pat_df[pat_df$cats=="FEMALE",diag]=nrow(temp_df[temp_df$gender=="FEMALE",])
+  pat_df[pat_df$cats=="MALE",diag]=nrow(temp_df[temp_df$gender=="MALE",])
+  
+  pat_df[pat_df$cats=="0-17",diag]=nrow(temp_df[temp_df$age<=17,])
+  pat_df[pat_df$cats=="18-30",diag]=nrow(temp_df[temp_df$age>17 && temp_df$age<=30,])
+  pat_df[pat_df$cats=="31-40",diag]=nrow(temp_df[temp_df$age>30 && temp_df$age<=40,])
+  pat_df[pat_df$cats=="41-50",diag]=nrow(temp_df[temp_df$age>40 && temp_df$age<=50,])
+  pat_df[pat_df$cats=="51-60",diag]=nrow(temp_df[temp_df$age>50 && temp_df$age<=60,])
+  pat_df[pat_df$cats=="61-70",diag]=nrow(temp_df[temp_df$age>60 && temp_df$age<=70,])
+  pat_df[pat_df$cats=="71-80",diag]=nrow(temp_df[temp_df$age>70 && temp_df$age<=80,])
+  pat_df[pat_df$cats=="81+",diag]=nrow(temp_df[temp_df$age>80,])
+  
+  reasons<-unique(temp_df[,cols<-grep("statusdiscontinuereason",colnames(pat_new))])
+  reasons_name<-names(temp_df)[grep("statusdiscontinuereason",colnames(pat_new))]
+  for(x in reasons){
+    pat_df[pat_df$cats==x,diag]=length(which(temp_df[[reasons_name]]==x))
+  }
+  
+}
+pat_df[pat_df$cats %in% c("Gender","Age-groups","status discont. reasons"),!(colnames(pat_df) %in% "cats")]="====="
+formattable(pat_df)
+
+```
+
+## 11b. patient data based on treatment
+```{r, eval=TRUE, echo=F, fig.height = 15, fig.width = 10}
+pat_df=data.frame(cats)
+drugtypes=unique(d_new_pre$drugtype)
+
+for(type in drugtypes){
+  temp_df<-d_new_pre[d_new_pre$drugtype==type,]
+  pat_df[,type]<-NA
+  
+  PID=unique(temp_df$CPR)
+  pat_temp=pat_new[pat_new$CPR %in% PID,]
+  
+  pat_df[pat_df$cats=="FEMALE",type]=nrow(pat_temp[pat_temp$gender=="FEMALE",])
+  pat_df[pat_df$cats=="MALE",type]=nrow(pat_temp[pat_temp$gender=="MALE",])
+  
+  pat_df[pat_df$cats=="0-17",type]=nrow(pat_temp[pat_temp$age<=17,])
+  pat_df[pat_df$cats=="18-30",type]=nrow(pat_temp[pat_temp$age>17 && pat_temp$age<=30,])
+  pat_df[pat_df$cats=="31-40",type]=nrow(pat_temp[pat_temp$age>30 && pat_temp$age<=40,])
+  pat_df[pat_df$cats=="41-50",type]=nrow(pat_temp[pat_temp$age>40 && pat_temp$age<=50,])
+  pat_df[pat_df$cats=="51-60",type]=nrow(pat_temp[pat_temp$age>50 && pat_temp$age<=60,])
+  pat_df[pat_df$cats=="61-70",type]=nrow(pat_temp[pat_temp$age>60 && pat_temp$age<=70,])
+  pat_df[pat_df$cats=="71-80",type]=nrow(pat_temp[pat_temp$age>70 && pat_temp$age<=80,])
+  pat_df[pat_df$cats=="81+",type]=nrow(pat_temp[pat_temp$age>80,])
+  
+  reasons=unique(pat_temp[,cols<-grep("statusdiscontinuereason",colnames(pat_temp))])
+  reasons_name<-names(pat_temp)[grep("statusdiscontinuereason",colnames(pat_temp))]
+  for(x in reasons){
+    pat_df[pat_df$cats==x,type]=length(which(pat_temp[[reasons_name]]==x))
+  }
+
+}
+pat_df[pat_df$cats %in% c("Gender","Age-groups","status discont. reasons"),!(colnames(pat_df) %in% "cats")]="====="
+formattable(pat_df)
+```
+

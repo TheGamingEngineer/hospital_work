@@ -1,0 +1,175 @@
+---
+title: "wanted ID issues"
+output: html_document
+date: '2022-06-16'
+---
+
+
+
+```{r, setup, eval=TRUE, echo=F, fig.height = 10, fig.width = 10}
+knitr::opts_chunk$set(echo = TRUE)
+library(parsedate)
+library(readxl)
+
+
+#handling of dates
+cast_dates = function(data){
+  date_variables = c("bio_drug_start_date","bio_drug_stop_date","date_of_last_visit","date_of_first_visit","end_of_follow_up_date","data_cut_date")
+  
+  for (var in date_variables){
+    if(!is.null(eval(parse(text=paste("data","$",var,sep=""))))){
+      data[,var] = parse_date(data[,var])
+    }
+  }
+  return(data)
+}
+
+filename = paste("../datasets/","ET/Estonia 09.06.2022_v3.txt",sep="")
+metadata <- paste("../datasets/","ET/metadata_master_raw_study_A2_A3 version_2.xlsx",sep="")
+d <- read.table(filename,header=T,sep = "\t")
+d = cast_dates(d)
+d$weeks_delta_to_baseline <- as.numeric(d$weeks_delta_to_baseline)
+```
+
+## 1. Patient ID's with more than one date_of_last_visit
+```{r, eval=TRUE, echo=FALSE}
+### print ID's for patients in bio drug series numbers with more than one date_of_last_visit
+for(i in 1: max(d$bio_drug_series_number)){
+  unique_ids <- unique(d$patient_id[d$bio_drug_series_number == i])
+  d_sub <- d[d$bio_drug_series_number == i & d$patient_id %in% unique_ids,]
+  d_sub<-d_sub[order(d_sub$patient_id),]
+  
+  print(paste("patient ID's for bio_drug_series_number: ", i))
+  print(unique(d_sub$patient_id[unique(d_sub$date_of_last_visit)>1]))
+  print("######################################################################################################")
+}
+
+```
+
+## 2. Patient ID's with more than one treatment per bio_drug_series_number
+```{r, eval=TRUE, echo=FALSE}
+### print ID's for patients in bio drug series numbers with more than one bio_drug_name within a serie
+for(i in 1: max(d$bio_drug_series_number)){
+  unique_ids <- unique(d$patient_id[d$bio_drug_series_number == i])
+  d_sub <- d[d$bio_drug_series_number == i & d$patient_id %in% unique_ids,]
+  drug_conflict=c()
+  d_sub<-d_sub[order(d_sub$patient_id),]
+  
+  for(n in d_sub$patient_id){
+    if(length(unique(d_sub$bio_drug_name[d_sub$patient_id==n]))>1){
+      drug_conflict<-append(drug_conflict,n)
+    }
+  }
+  if(!(is.null(drug_conflict))){
+    print(paste("Patient ID's for bio_drug_series_number: ", i))
+    print(unique(drug_conflict))
+    print("#######################################################################################################")
+  }
+}
+
+```
+
+## 3. Patient ID's with visits after bio_drug_stop_date
+```{r, eval=TRUE, echo=FALSE}
+### print ID's for patients in bio drug series numbers with visits after bio_drug_stop_date
+for(i in 1: max(d$bio_drug_series_number)){
+  unique_ids <- unique(d$patient_id[d$bio_drug_series_number == i])
+  d_sub <- d[d$bio_drug_series_number == i & d$patient_id %in% unique_ids,]
+  d_sub$bio_drug_weeks_delta_to_baseline=difftime(strptime(d_sub$bio_drug_stop_date,format="%Y%m%d"),strptime(d_sub$bio_drug_start_date,format="%Y%m%d"),units="weeks")
+  bio_drug_conflict=c()
+  d_sub<-d_sub[order(d_sub$patient_id),]
+  
+  if(is.na(unique(d_sub$bio_drug_weeks_delta_to_baseline))){
+    d_sub$bio_drug_weeks_delta_to_baseline=difftime(as.Date(d_sub$bio_drug_stop_date),
+                                                    as.Date(d_sub$bio_drug_start_date),units="weeks")}
+  d_sub$bio_drug_weeks_delta_to_baseline[is.na(d_sub$bio_drug_weeks_delta_to_baseline)] = Inf
+  
+  
+  for(n in d_sub$row_id){
+    if(d_sub$weeks_delta_to_baseline[d_sub$row_id==n] > d_sub$bio_drug_weeks_delta_to_baseline[d_sub$row_id==n]){
+      bio_drug_conflict<-append(bio_drug_conflict,d_sub$patient_id[d_sub$row_id==n])
+    }
+  }
+  if(!(is.null(bio_drug_conflict))){
+    print(paste("Patient ID's for bio_drug_series_number: ", i))
+    print(unique(bio_drug_conflict))
+    print("#######################################################################################################")
+  }
+}
+
+```
+
+## 4. Patient ID's with visits after date_of_last_visit
+```{r, eval=TRUE, echo=FALSE}
+### print ID's for patients in bio drug series numbers with visits after date_of_last_visit
+for(i in 1: max(d$bio_drug_series_number)){
+  unique_ids <- unique(d$patient_id[d$bio_drug_series_number == i])
+  d_sub <- d[d$bio_drug_series_number == i & d$patient_id %in% unique_ids,]
+  d_sub$bio_drug_weeks_delta_to_baseline=difftime(strptime(d_sub$bio_drug_stop_date,format="%Y%m%d"),strptime(d_sub$bio_drug_start_date,format="%Y%m%d"),units="weeks")
+  last_visit_conflict=c()
+  d_sub<-d_sub[order(d_sub$patient_id),]
+  
+  keep_id<-c()
+  for(pid in unique_ids){
+    if(length(unique(d$bio_drug_series_number[d$patient_id==pid]))==i){
+      keep_id<-c(keep_id,pid)
+    }
+  }
+  
+  if("date_of_last_visit" %in% colnames(d_sub)){
+    d_sub$last_visit_weeks_delta_to_baseline=difftime(as.Date(d_sub$date_of_last_visit),as.Date(d_sub$bio_drug_start_date),units="weeks")
+    d_sub$last_visit_weeks_delta_to_baseline[is.na(d_sub$last_visit_weeks_delta_to_baseline) | !(d_sub$patient_id %in% keep_id)] = Inf
+  }
+  
+  for(n in d_sub$row_id){
+    if(d_sub$weeks_delta_to_baseline[d_sub$row_id==n] >d_sub$last_visit_weeks_delta_to_baseline[d_sub$row_id==n]){
+      last_visit_conflict<-append(last_visit_conflict,d_sub$patient_id[d_sub$row_id==n])
+    }
+  }
+  if(!(is.null(last_visit_conflict))){
+    print(paste("Patient ID's for bio_drug_series_number: ", i))
+    print(unique(last_visit_conflict))
+    print("#######################################################################################################")
+  }
+}
+
+```
+
+## 5. Patient ID's with visits after end_of_follow_up
+```{r, eval=TRUE, echo=FALSE}
+### print ID's for patients in bio drug series numbers with visits after bio_drug_stop_date
+for(i in 1: max(d$bio_drug_series_number)){
+  unique_ids <- unique(d$patient_id[d$bio_drug_series_number == i])
+  d_sub <- d[d$bio_drug_series_number == i & d$patient_id %in% unique_ids,]
+  d_sub$ending_follow_up_weeks_delta_to_baseline=difftime(strptime(d_sub$end_of_follow_up_date,format="%Y%m%d"),strptime(d_sub$bio_drug_start_date,format="%Y%m%d"),units="weeks")
+  follow_up_conflict=c()
+  d_sub<-d_sub[order(d_sub$patient_id),]
+  
+  keep_id<-c()
+  for(pid in unique_ids){
+    if(length(unique(d$bio_drug_series_number[d$patient_id==pid]))==i){
+      keep_id<-c(keep_id,pid)
+    }
+  }
+  
+  if("end_of_follow_up_date" %in% colnames(d_sub)){
+    d_sub$ending_follow_up_weeks_delta_to_baseline=difftime(as.Date(d_sub$end_of_follow_up_date),as.Date(d_sub$bio_drug_start_date),units="weeks")}
+  
+  
+  d_sub$ending_follow_up_weeks_delta_to_baseline[is.na(d_sub$ending_follow_up_weeks_delta_to_baseline) | 
+                                                   !(d_sub$patient_id %in% keep_id)] = Inf
+  
+  
+  for(n in d_sub$row_id){
+    if(d_sub$weeks_delta_to_baseline[d_sub$row_id==n] > d_sub$ending_follow_up_weeks_delta_to_baseline[d_sub$row_id==n]){
+      follow_up_conflict<-append(follow_up_conflict,d_sub$patient_id[d_sub$row_id==n])
+    }
+  }
+  if(!(is.null(follow_up_conflict))){
+    print(paste("Patient ID's for bio_drug_series_number: ", i))
+    print(unique(follow_up_conflict))
+    print("#######################################################################################################")
+  }
+}
+
+```

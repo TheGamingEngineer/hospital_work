@@ -118,7 +118,7 @@ isolate_diagnosis=TRUE # would you like to isolate diagnosis'
 #data_cut_1 <- as.Date("20211105",format="%Y%m%d")
 data_cut_1 <- as.Date("20221007",format="%Y%m%d")
 #data_cut_2 <- as.Date("20220930",format="%Y%m%d")
-data_cut_2 <- as.Date("20230825",format="%Y%m%d")
+data_cut_2 <- as.Date("20230929",format="%Y%m%d")
 
 #import data using readxl package
 library(readxl) #read_excel
@@ -133,8 +133,7 @@ library("plyr")
 
 metadata=read_excel("~/GitHub/upa_data_dump/UPA_metadata_AKBA_20230821.xlsx")
 
-new_path = "~/GitHub/upa_data_dump/dump/UPA_20230908/"
-
+new_path = "~/GitHub/upa_data_dump/dump/UPA_20231010/"
 old_path = "~/GitHub/upa_data_dump/dump/UPA_dump_20221103/"
 
 
@@ -276,7 +275,7 @@ pat_old$afdelings_skift = afdelingsskift(pat_old)
 
 ```
 
-## computed data_cut_dates
+## data_cut_dates (input by user)
 
 ```{r,eval=TRUE,echo=FALSE}
 print(paste0("data_cut_1=",data_cut_1))
@@ -451,9 +450,9 @@ print(out_tab2)
 periode_start = c()
 periode_stop = c()
 vars = c()
-new_vis_date<-colnames(d_new_visit[grepl("date",colnames(d_new_visit))])
+new_vis_date<-colnames(d_new_visit[grepl("date$",colnames(d_new_visit))])
 
-
+d_new_visit$visitdate_int = as.numeric(format(d_new_visit[,cols<-new_vis_date],format="%Y%m%d"))
 for(var in setdiff(colnames(d_new_visit),c("X"))){
   
   periode_start = c(periode_start, as.character(as.Date(as.character(min(d_new_visit$visitdate_int[!is.na(d_new_visit[,var])],na.rm=T)),format = "%Y%m%d")))
@@ -468,7 +467,7 @@ rownames(out_tab) = unique(vars)
 periode_start = c()
 periode_stop  = c()
 vars = c()
-old_vis_date<-colnames(d_old_visit[grepl("date",colnames(d_old_visit))])
+old_vis_date<-colnames(d_old_visit[grepl("date$",colnames(d_old_visit))])
 
 d_old_visit$visitdate_int = as.numeric(format(d_old_visit[,cols<-old_vis_date],format="%Y%m%d"))
 for(var in setdiff(colnames(d_old_visit),c("X","anchor"))){
@@ -584,8 +583,8 @@ d_old_visit <- add_cpr_new(d_old_visit,id_map_old, clean_weird_cpr = FALSE)
 d_old_yearly <- add_cpr_new(d_old_yearly,id_map_old, clean_weird_cpr = FALSE)
 
 ## adding unique_prescription_id's to prescription tables
-d_new_pre$unique_prescription_id = paste0(d_new_pre[,cols<-grep("nique_patient_id",colnames(d_new_pre))],"/",d_new_pre$Prescription,"_",d_new_pre[,cols<-grep("start",colnames(d_new_pre))])
-d_old_pre$unique_prescription_id = paste0(d_old_pre[,cols<-grep("nique_patient_id",colnames(d_old_pre))],"/",d_old_pre[,cols<-grep("name",colnames(d_old_pre))],"_",d_old_pre[,cols<-grep("start",colnames(d_old_pre))])
+d_new_pre$unique_prescription_id = paste0(d_new_pre$patient_id,"_",d_new_pre$Prescription,"_",d_new_pre[,cols<-grep("start",colnames(d_new_pre))])
+d_old_pre$unique_prescription_id = paste0(d_old_pre$patient_id,"_",d_old_pre[,cols<-grep("name",colnames(d_old_pre))],"_",d_old_pre[,cols<-grep("start",colnames(d_old_pre))])
 
 ## unifies variabel names.
 pat_new = rename_variables(pat_new,metadata)
@@ -720,48 +719,72 @@ print("Old dump")
 tmp = unique(pat_old[,c("socialsecuritynumber","diagnosis")])
 print(table(tmp$diagnosis))
 
+d_old_pat_before_filtering = pat_old
+d_new_pat_before_filtering = pat_new
+
 ### before we continue to the next section ###
 if(isolate_diagnosis==TRUE){
   pat_new=pat_new[pat_new$diagnosis %in% c("DIAGNOSIS_M05_9","DIAGNOSIS_M06_0","DIAGNOSIS_M06_9"),]
   pat_old=pat_old[pat_old$diagnosis %in% c("DIAGNOSIS_M05_9","DIAGNOSIS_M06_0","DIAGNOSIS_M06_9"),]
 }
 
-unique_id_old = unique(pat_old$unique_patient_id)
-unique_id_new = unique(pat_new$unique_patient_id)
+cpr_id_old_pat = unique(pat_old$patient_id)
+cpr_id_new_pat = unique(pat_new$patient_id)
 
-drugs = unique(c(d_new_pre$drugname[startsWith(d_new_pre$drugname,'BIOLOGIC') & d_new_pre$drugname!="BIOLOGIC_MYCOPHENOLAT"],'DMARD_MTX','DMARD_MTX_SC','DMARD_MTX_IM','DMARD_SZS','DMARD_CHLOROCHINE','DMARD_LEFLUN'))
+drugs = unique(c(d_old_pre$drugname[startsWith(d_old_pre$drugname,'BIOLOGIC') | startsWith(d_old_pre$drugname,'DMARD')], d_new_pre$drugname[startsWith(d_new_pre$drugname,'BIOLOGIC')  | startsWith(d_new_pre$drugname,'DMARD')]))
 
+d_old_pre_before_filtering = d_old_pre
+d_new_pre_before_filtering = d_new_pre
+
+d_old_visit_before_filtering = d_old_visit
+d_new_visit_before_filtering = d_new_visit
 
 # Filtrering
-unique_id_old = intersect(x=unique_id_old ,y=unique(d_old_pre[d_old_pre$drugname %in% drugs 
+cpr_id_old = intersect(x=cpr_id_old_pat ,y=unique(d_old_pre[d_old_pre$drugname %in% drugs 
                                                           & d_old_pre$drugstartdate >= as.Date(as.character(20190101),format="%Y%m%d") 
-                                                          | (d_old_pre$drugstartdate < as.Date(as.character(20190101),format="%Y%m%d") 
-                                                          & is.na(d_old_pre$drugstopdate)) | ( d_old_pre$drugstartdate 
+                                                          | (d_old_pre$drugstartdate < as.Date(as.character(20190101),format="%Y%m%d")
+                                                          & is.na(d_old_pre$drugstopdate)) | ( d_old_pre$drugstartdate
                                                           < as.Date(as.character(20190101),format="%Y%m%d") 
                                                           & d_old_pre$drugstopdate 
-                                                          >= as.Date(as.character(20190101),format="%Y%m%d")),]$unique_patient_id))
+                                                          >= as.Date(as.character(20190101),format="%Y%m%d")),]$patient_id))
 
-unique_id_new = intersect(x=unique_id_new ,y=unique(d_new_pre[d_new_pre$drugname %in% drugs 
+cpr_id_new = intersect(x=cpr_id_new_pat ,y=unique(d_new_pre[d_new_pre$drugname %in% drugs 
                                                               & d_new_pre$drugstartdate >= as.Date(as.character(20190101),format="%Y%m%d") 
                                                               | (d_new_pre$drugstartdate < as.Date(as.character(20190101),format="%Y%m%d") 
                                                               & is.na(d_new_pre$drugstopdate)) | ( d_new_pre$drugstartdate 
                                                               < as.Date(as.character(20190101),format="%Y%m%d") 
                                                               & d_new_pre$drugstopdate 
-                                                              >= as.Date(as.character(20190101),format="%Y%m%d")),]$unique_patient_id))
+                                                              >= as.Date(as.character(20190101),format="%Y%m%d")),]$patient_id))
 
-pat_new = pat_new[pat_new$unique_patient_id %in% unique_id_new,]
-pat_old = pat_old[pat_old$unique_patient_id %in% unique_id_old,]
+
+#sum(d_new_pre$patient_id == "0106510741")
+#sum(d_new_pre$patient_id[d_new_pre$unique_patient_id %in% unique_id_new] == "0106510741")
+#sum(d_new_pre$patient_id[unique_id_new_pat %in% unique_id_new] == "0106510741")
+
+#sum(d_new_pre$patient_id[unique_id_new_pat %in% unique_id_new] == "0106510741")
+
+#0106510741
+# danbiohospitalnghospital_45003002/danbiopatient.2012-05-10.3885977320_shared003002
+#stop()
+old_filtered = setdiff(d_old_pre$patient_id,cpr_id_old)
+new_filtered = setdiff(d_new_pre$patient_id,cpr_id_new)
   
-d_new_pre=d_new_pre[d_new_pre$unique_patient_id %in% unique_id_new,]
-d_old_pre=d_old_pre[d_old_pre$unique_patient_id %in% unique_id_old,]
+gained_due_to_filtering = setdiff(old_filtered, new_filtered)
+lost_due_to_filtering = setdiff(new_filtered, old_filtered)
+
+pat_new = pat_new[pat_new$patient_id %in% cpr_id_new,]
+pat_old = pat_old[pat_old$patient_id %in% cpr_id_old,]
+  
+d_new_pre=d_new_pre[d_new_pre$patient_id %in% cpr_id_new,]
+d_old_pre=d_old_pre[d_old_pre$patient_id %in% cpr_id_old,]
 
 if(include_SAE==TRUE){
-  d_new_sae=d_new_sae[d_new_sae$unique_patient_id %in% unique_id_new,]
-  d_old_sae=d_old_sae[d_old_sae$unique_patient_id %in% unique_id_old,]
+  d_new_sae=d_new_sae[d_new_sae$patient_id %in% cpr_id_new,]
+  d_old_sae=d_old_sae[d_old_sae$patient_id %in% cpr_id_old,]
 }
 
-d_new_visit=d_new_visit[d_new_visit$unique_patient_id %in% unique_id_new,]
-d_old_visit=d_old_visit[d_old_visit$unique_patient_id %in% unique_id_old,]
+d_new_visit=d_new_visit[d_new_visit$patient_id %in% cpr_id_new,]
+d_old_visit=d_old_visit[d_old_visit$patient_id %in% cpr_id_old,]
 
 print("After filtering")
 # Unique cpr nr. with diagnosis in new dump
@@ -965,8 +988,8 @@ formattable(df)
 d_new_pre_old = d_new_pre
 d_old_pre_old = d_old_pre
 
-d_new_pre = unique(d_new_pre[,c("unique_patient_id","drugname","drugstartdate","registrationdate","unique_prescription_id")])
-d_old_pre = unique(d_old_pre[,c("unique_patient_id","drugname","drugstartdate","registrationdate","unique_prescription_id")])
+d_new_pre = unique(d_new_pre[,c("unique_patient_id","drugname","drugstartdate","drugstopdate","registrationdate","unique_prescription_id","patient_id")])
+d_old_pre = unique(d_old_pre[,c("unique_patient_id","drugname","drugstartdate","drugstopdate","registrationdate","unique_prescription_id","patient_id")])
 
 multi_merge<-function(list,variabel){
   output=""
@@ -1196,22 +1219,22 @@ d_old_sae$unique_sae_id <- str_split_fixed(d_old_sae$unique_sae_id,"/",3)[,3]
 d_new_sae$saename = apply(as.data.frame(d_new_sae$saename),1,FUN=function(x) {paste(head(unlist(strsplit(x,"")),10),collapse="")})
 d_old_sae$saename = apply(as.data.frame(d_old_sae$saename),1,FUN=function(x) {paste(head(unlist(strsplit(x,"")),10),collapse="")})
 
-SAE_gained <-setdiff(d_new_sae$sae_id,d_old_sae$sae_id)
-SAE_lost   <-setdiff(d_old_sae$sae_id,d_new_sae$sae_id)
+SAE_gained <-setdiff(d_new_sae$unique_sae_id,d_old_sae$unique_sae_id)
+SAE_lost   <-setdiff(d_old_sae$unique_sae_id,d_new_sae$unique_sae_id)
 
-SAE_overlap <- intersect(d_old_sae$sae_id,d_new_sae$sae_id)
+SAE_overlap <- intersect(d_old_sae$unique_sae_id,d_new_sae$unique_sae_id)
 
-df_lost_sae<-d_old_sae[d_old_sae$sae_id %in% SAE_lost,]
-df_gain_sae<-d_new_sae[d_new_sae$sae_id %in% SAE_gained,]
+df_lost_sae<-d_old_sae[d_old_sae$unique_sae_id %in% SAE_lost,]
+df_gain_sae<-d_new_sae[d_new_sae$unique_sae_id %in% SAE_gained,]
 
-df_same_sae<-d_new_sae[d_new_sae$sae_id %in% SAE_overlap,]
+df_same_sae<-d_new_sae[d_new_sae$unique_sae_id %in% SAE_overlap,]
 
 #df_lost_sae<-df_lost_sae[,colnames(df_lost_sae) %in% c("patient_id","unique_sae_id","saestartdate","saestopdate","saename")]
 #df_gain_sae<-df_gain_sae[,colnames(df_gain_sae) %in% c("unique_sae_id","saestartdate","saestopdate","saename")]
 #df_same_sae<-df_same_sae[,colnames(df_same_sae) %in% c("unique_sae_id","saestartdate","saestopdate","saename")]
 
 df_lost_sae <- df_lost_sae[,colnames(df_lost_sae) %in% c("patient_id","unique_sae_id","saestartdate","saestopdate","saename","sae_id")]
-df_gain_sae <- df_gain_sae[,colnames(df_gain_sae) %in% c("unique_sae_id","saestartdate","saestopdate","saename","sae_id")]
+df_gain_sae <- df_gain_sae[,colnames(df_gain_sae) %in% c("patient_id","unique_sae_id","saestartdate","saestopdate","saename","sae_id")]
 
 int = intersect(df_lost_sae$unique_sae_id, df_gain_sae$unique_sae_id)
 
@@ -1229,14 +1252,16 @@ for(x in df_lost_sae$patient_id){
 df_lost_sae$lost_patient = df_lost_sae$patient_id %in% pat_loss
 df_gain_sae$gained_patient = df_gain_sae$patient_id %in% pat_gain
 
+
+df_lost_sae$patient_status = NA
+
 for(pid in unique(df_lost_sae$patient_id)){
   #print(pid)
-  #print(pat_old$statusdiscontinuereasonuserdecided[pat_old$patient_id == pid])
-  df_lost_sae$review_state_patient[df_lost_sae$patient_id == pid] = unique(pat_old$statusdiscontinuereasonuserdecided[pat_old$patient_id == pid])[1]
+  df_lost_sae$patient_status[df_lost_sae$patient_id == pid] = unique(pat_old$statusdiscontinuereasonuserdecided[pat_old$patient_id == pid])[1]
 }
 
 #df_lost_sae<-df_lost_sae[,colnames(df_lost_sae) %in% c("unique_sae_id","saestartdate","saestopdate","saename","diagnosis","review_state_patient","lost_patient")]
-df_lost_sae<-df_lost_sae[,colnames(df_lost_sae) %in% c("unique_sae_id","sae_id","saestartdate","saestopdate","saename","diagnosis","review_state_patient","lost_patient")]
+df_lost_sae<-df_lost_sae[,colnames(df_lost_sae) %in% c("unique_sae_id","sae_id","saestartdate","saestopdate","saename","diagnosis","patient_status","lost_patient")]
 
 print(paste0("#### Lost SAE's (in total:",length(SAE_lost),"): ####"))
 if(length(SAE_lost)>0){
@@ -1263,7 +1288,7 @@ print(paste0("#### Overlapping SAE's (in total:",length(SAE_overlap),"): ####"))
 ```{r,eval=TRUE, echo=F}
 ### Isolate data from lost patients ###
 
-d_pat_loss=pat_old[pat_old$socialsecuritynumber %in% pat_loss,]
+d_pat_loss=pat_old[pat_old$patient_id %in% pat_loss,]
 #d_pat_loss[d_pat_loss==""]=NA
 
 d_pre_loss=d_old_pre[d_old_pre$unique_patient_id %in% d_pat_loss$unique_patient_id,]
@@ -1279,40 +1304,36 @@ d_yearly_loss=d_old_yearly[d_old_yearly$patient_id %in% pat_loss,]
 #d_yearly_loss[d_yearly_loss==""]=NA
 
 ## make date statistics subtabel for patient tabel
-pat_date_var=d_pat_loss[colnames(d_pat_loss) %in% c("monthyearofdiagnosis","monthyearstartofsymptoms",
-                                                    "statusdiscontinuedatenationalregistrysync","statusdiscontinuedateuserdecided")]
+pat_date_var=d_pat_loss[colnames(d_pat_loss) %in% c("monthyearofdiagnosis","monthyearstartofsymptoms", "statusdiscontinuedatenationalregistrysync","statusdiscontinuedateuserdecided")]
 print("###########################################################################################")
 print("###################################### PATIENT LEVEL ######################################")
 print("###########################################################################################")
-print(paste("# patients = ",length(d_pat_loss)))
+print(paste("# patients = ",length(unique(pat_loss))))
 for(x in colnames(pat_date_var)){
-  #values<-d_pat_loss[!is.na(d_pat_loss[,col<-x]),col<-x]
-  #print(x)
-  #tem<-hist(values,breaks=10,main=x,xlab=x)
-  #counts<-append(NA,tem$counts)
-  #print(tem$breaks)
-  #print(counts)
   values<-na.omit(parse_date(d_pat_loss[,col<-x]))
-  hist(values,breaks=10,main=x,xlab=x)
+  values<-values[values>as.Date("1800-01-01")]
+  HIST<-hist(values,breaks="years",format="%Y-%m",main=x,xlab="",freq=TRUE,las=2)
   print("=======================================================================================")
 }
 
-
 ## make date statistics subtabel for treatment tabel
 pre_date_var=d_pre_loss[colnames(d_pre_loss) %in% c("drugstartdate","drugstopdate","registrationdate")]
+wanted_drug_types=c("BIOLOGIC","DMARD","STEROID")
 print("#############################################################################################")
 print("###################################### TREATMENT LEVEL ######################################")
 print("#############################################################################################")
 print(paste("# treatments = ",nrow(d_pre_loss)))
 for(x in colnames(pre_date_var)){
-  #values<-d_pre_loss[!is.na(d_pre_loss[,col<-x]),col<-x]
-  #print(x)
-  #tem<-hist(values,breaks=10,main=x,xlab=x)
-  #counts<-append(NA,tem$counts)
-  #print(tem$breaks)
-  #print(counts)
   values<-na.omit(parse_date(d_pre_loss[,col<-x]))
-  hist(values,breaks=10,main=x,xlab=x)
+  values<-values[values>as.Date("1800-01-01")]
+  HIST<-hist(values,breaks="years",format="%Y-%m",main=x,xlab="",freq=TRUE,las=2)
+  if(x=="drugstartdate"){
+    for(type in wanted_drug_types){
+      values<-na.omit(parse_date(d_pre_loss[d_pre_loss$drugtype == type,col<-x]))
+      values<-values[values>as.Date("1800-01-01")]
+      HIST<-hist(values,breaks="years",format="%Y-%m",main=paste(c(x,"(",type,")")),xlab="",freq=TRUE,las=2)
+    }
+  }
   print("=======================================================================================")
 }
 
@@ -1323,14 +1344,9 @@ print("###################################### SAE LEVEL ########################
 print("#######################################################################################")
 print(paste("# SAE's = ",nrow(d_sae_loss)))
 for(x in colnames(sae_date_var)){
-  #values<-d_sae_loss[!is.na(d_sae_loss[,col<-x]),col<-x]
-  #print(x)
-  #tem<-hist(values,breaks=10,main=x,xlab=x)
-  #counts<-append(NA,tem$counts)
-  #print(tem$breaks)
-  #print(counts)
   values<-na.omit(parse_date(d_sae_loss[,col<-x]))
-  hist(values,breaks=10,main=x,xlab=x)
+  values<-values[values>as.Date("1800-01-01")]
+  HIST<-hist(values,breaks="years",format="%Y-%m",main=x,xlab="",freq=TRUE,las=2)
   print("=======================================================================================")
 }
 
@@ -1341,14 +1357,9 @@ print("###################################### VISIT LEVEL ######################
 print("#########################################################################################")
 print(paste("# visits = ",nrow(d_visit_loss)))
 for(x in colnames(vis_date_var)){
-  #values<-d_visit_loss[!is.na(d_visit_loss[,col<-x]),col<-x]
-  #print(x)
-  #tem<-hist(values,breaks=10,main=x,xlab=x)
-  #counts<-append(NA,tem$counts)
-  #print(tem$breaks)
-  #print(counts)
   values<-na.omit(parse_date(d_visit_loss[,col<-x]))
-  hist(values,breaks=10,main=x,xlab=x)
+  values<-values[values>as.Date("1800-01-01")]
+  HIST<-hist(values,breaks="years",format="%Y-%m",main=x,xlab="",freq=TRUE,las=2)
   print("=======================================================================================")
 }
 
@@ -1359,19 +1370,14 @@ print("###################################### YEARLY LEVEL #####################
 print("##########################################################################################")
 print(paste("# yearly visits = ",nrow(d_yearly_loss)))
 for(x in colnames(year_date_var)){
-  #values<-d_yearly_loss[!is.na(d_yearly_loss[,col<-x]),col<-x]
-  #print(x)
-  #tem<-hist(values,breaks=10,main=x,xlab=x)
-  #counts<-append(NA,tem$counts)
-  #print(tem$breaks)
-  #print(counts)
   values<-na.omit(parse_date(d_yearly_loss[,col<-x]))
-  hist(values,breaks=10,main=x,xlab=x)
+  values<-values[values>as.Date("1800-01-01")]
+  HIST<-hist(values,breaks="years",format="%Y-%m",main=x,xlab="",freq=TRUE,las=2)
   print("=======================================================================================")
 }
 ```
 
-## 11. Content overview of categorical variabels for lost patients
+## 11a. Content overview of categorical variabels for lost patients
 ```{r,eval=TRUE, echo=F}
 categorization=function(df){
   wanted<-c("gender","diagnosis","statusdiscontinuereasonnationalregistrysync",
@@ -1396,7 +1402,7 @@ year_cat_loss=categorization(d_yearly_loss)
 
 
 print("################################# PATIENT TABEL #################################")
-print(paste("# lost patients:",length(unique(pat_cat_loss$socialsecuritynumber))))
+print(paste("# lost patients:",length(unique(d_pat_loss$patient_id))))
 for(x in colnames(pat_cat_loss)){
   print(paste("################# ",x," #####################"))
   print(table(pat_cat_loss[,x]))
@@ -1430,4 +1436,194 @@ for(x in colnames(year_cat_loss)){
   print(table(year_cat_loss[,x]))
 }
 
+
+print("################################# Treatment and visit count #################################")
+lost_and_filtered = intersect(lost_due_to_filtering, d_pat_loss$patient_id)
+print(paste("# Treatment and visit count:",length(lost_and_filtered)))
+
+#for(pid in lost_and_filtered){
+#  print(paste(c(pid
+#  ,nrow(d_old_pre_before_filtering[d_old_pre_before_filtering$patient_id == pid,])
+#  ,nrow(d_new_pre_before_filtering[d_new_pre_before_filtering$patient_id == pid,])
+#  ,nrow(d_old_visit_before_filtering[d_old_visit_before_filtering$patient_id == pid,])
+#  ,nrow(d_new_visit_before_filtering[d_new_visit_before_filtering$patient_id == pid,])),collapse=" "))
+#  
+#  print(d_old_pat_before_filtering[d_old_pat_before_filtering$patient_id == pid, c("unique_patient_id","diagnosis","monthyearofdiagnosis")])
+#  print(d_new_pat_before_filtering[d_new_pat_before_filtering$patient_id == pid, c("unique_patient_id","diagnosis","monthyearofdiagnosis")])
+#  
+#  print(d_old_pre_before_filtering[d_old_pre_before_filtering$patient_id == pid,c("unique_patient_id","drugname","drugstartdate","drugstopdate")])
+#  print(d_new_pre_before_filtering[d_new_pre_before_filtering$patient_id == pid,c("unique_patient_id","drugname","drugstartdate","drugstopdate")])
+#  print(d_old_visit_before_filtering[d_old_visit_before_filtering$patient_id == pid,])
+#  print(d_new_visit_before_filtering[d_new_visit_before_filtering$patient_id == pid,])
+#}
+
+
 ```
+
+
+
+## 11b. treatment and visit count for patients lost to filtering
+```{r,eval=TRUE, echo=F}
+lost_and_filtered = intersect(lost_due_to_filtering, d_pat_loss$patient_id)
+
+d_new_pat_before_filtering_sub = d_new_pat_before_filtering[d_new_pat_before_filtering$patient_id %in% lost_due_to_filtering,]
+
+d_new_pat_before_filtering_sub = d_new_pat_before_filtering_sub[order(d_new_pat_before_filtering_sub$socialsecuritynumber,d_new_pat_before_filtering_sub$monthyearofdiagnosis,decreasing = T),]
+
+print(paste("Number of patients lost due to filtering: ",length(lost_and_filtered)))
+
+filtered_df=data.frame(patient_id=integer(),
+                       ra_diagnosis= integer(),
+                       has_rituximab = integer(),
+                       lost_old_treatments=integer(),
+                       lost_new_treatments=integer(),
+                       lost_old_visits=integer(),
+                       lost_new_visits=integer(),
+                       difference=integer())
+
+for(pid in lost_and_filtered){
+  
+ old_lost_pre=nrow(unique(d_old_pre_before_filtering[d_old_pre_before_filtering$patient_id == pid,c("drugname","drugstartdate","drugstopdate")]))
+ new_lost_pre=nrow(unique(d_new_pre_before_filtering[d_new_pre_before_filtering$patient_id == pid,c("drugname","drugstartdate","drugstopdate")]))
+ old_lost_vis=nrow(unique(d_old_visit_before_filtering[d_old_visit_before_filtering$patient_id == pid,c("visitdate","patient_id")]))
+ new_lost_vis=nrow(unique(d_new_visit_before_filtering[d_new_visit_before_filtering$patient_id == pid,c("visitdate","patient_id")]))
+ 
+ pre_diff=nrow(unique(d_old_pre_before_filtering[d_old_pre_before_filtering$patient_id == pid,c("drugname","drugstartdate","drugstopdate")]))-nrow(unique(d_new_pre_before_filtering[d_new_pre_before_filtering$patient_id == pid,c("drugname","drugstartdate","drugstopdate")]))
+
+has_rituximab = ifelse(any((d_old_pre_before_filtering[d_old_pre_before_filtering$patient_id == pid, "drugname"]) %in% c("BIOLOGIC_RITUXIMAB")),1,0)
+
+ra_diagnosis = ifelse(any((d_new_pat_before_filtering[d_new_pat_before_filtering$patient_id == pid, "diagnosis"]) %in% c("DIAGNOSIS_M05_9","DIAGNOSIS_M06_0","DIAGNOSIS_M06_9")),1,0)
+ 
+  filtered_df[nrow(filtered_df)+1,] = c(pid,ra_diagnosis,has_rituximab,old_lost_pre,new_lost_pre, old_lost_vis,new_lost_vis, pre_diff)
+}
+
+filtered_df=filtered_df[order(filtered_df$difference,decreasing = T),]
+filtered_df=filtered_df[filtered_df$difference>0,]
+filtered_df=filtered_df[,colnames(filtered_df) %in% c("patient_id","ra_diagnosis","has_rituximab","lost_old_treatments","lost_new_treatments","lost_old_visits","lost_new_visits")]
+
+rownames(filtered_df) = 1:nrow(filtered_df)
+filtered_df$row_nr = 1:nrow(filtered_df)
+
+filtered_df=filtered_df[,c("row_nr","patient_id","ra_diagnosis","has_rituximab","lost_old_treatments","lost_new_treatments","lost_old_visits","lost_new_visits")]
+
+formattable(filtered_df)
+```
+
+## 11c. treatment and visit count for patients in common between dumps
+```{r,eval=TRUE, echo=F}
+ids_in_common = intersect(pat_old$patient_id, pat_new$patient_id)
+
+d_new_pat_common_sub = pat_new[pat_new$patient_id %in% ids_in_common,]
+
+d_new_pat_common_sub = d_new_pat_common_sub[order(d_new_pat_common_sub$patient_id,d_new_pat_common_sub$monthyearofdiagnosis,decreasing = T),]
+
+d_old_pat_common_sub = pat_old[pat_old$patient_id %in% ids_in_common,]
+
+d_old_pat_common_sub = d_old_pat_common_sub[order(d_old_pat_common_sub$patient_id,d_old_pat_common_sub$monthyearofdiagnosis,decreasing = T),]
+
+print(paste("Number of patients in common between dumps: ",length(ids_in_common)))
+
+filtered_df=data.frame(patient_id=integer(),
+                       lost_unique_patient_ids= integer(),
+                       lost_treatments = integer(),
+                       old_treatments=integer(),
+                       new_treatments=integer(),
+                       old_visits=integer(),
+                       new_visits=integer(),
+                       difference=integer())
+
+for(pid in ids_in_common){
+ old_pre=nrow(unique(d_old_pre[d_old_pre$patient_id == pid,]))
+ new_pre=nrow(unique(d_new_pre[d_new_pre$patient_id == pid,]))
+ old_vis=nrow(unique(d_old_visit[d_old_visit$patient_id == pid,]))
+ new_vis=nrow(unique(d_new_visit[d_new_visit$patient_id == pid,]))
+ 
+ pre_diff=length(setdiff(d_old_pre[d_old_pre$patient_id == pid,]$unique_prescription_id,d_new_pre[d_new_pre$patient_id == pid,]$unique_prescription_id))
+ 
+ lost_pat_id = length(setdiff(d_old_pre[d_old_pre$patient_id == pid,]$unique_patient_id,
+                              d_new_pre[d_new_pre$patient_id == pid,]$unique_patient_id))
+ 
+ lost_treat = length(setdiff(d_old_pre[d_old_pre$patient_id == pid,]$unique_prescription_id,
+                             d_new_pre[d_new_pre$patient_id == pid,]$unique_prescription_id))
+
+ filtered_df[nrow(filtered_df)+1,] = c(pid,lost_pat_id,lost_treat,old_pre,new_pre, old_vis,new_vis, pre_diff)
+}
+
+filtered_df=filtered_df[order(filtered_df$difference,decreasing = T),]
+filtered_df=filtered_df[filtered_df$difference>0,]
+filtered_df=filtered_df[,colnames(filtered_df) %in% c("patient_id","lost_unique_patient_ids","lost_treatments","old_treatments","new_treatments","old_visits","new_visits")]
+
+rownames(filtered_df) = 1:nrow(filtered_df)
+filtered_df$row_nr = 1:nrow(filtered_df)
+filtered_df=filtered_df[,c("row_nr","patient_id","lost_unique_patient_ids","lost_treatments","old_treatments","new_treatments","old_visits","new_visits")]
+
+formattable(filtered_df)
+```
+
+## 12 drugstartdate statistics on lost treatment data
+```{r,eval=TRUE, echo=F}
+
+lost_treatments = setdiff(d_old_pre$unique_prescription_id,d_new_pre$unique_prescription_id)
+lost_treatments_of_lost_patients = d_old_pre[d_old_pre$patient_id %in% d_pat_loss$patient_id,]$unique_prescription_id
+lost_treatments = setdiff(lost_treatments,lost_treatments_of_lost_patients)
+
+#lost_treatments=unique(na.omit(setdiff(d_old_pre$unique_prescription_id,d_new_pre$unique_prescription_id)))
+#lost_treatments_of_lost_patients=d_old_pre[d_old_pre$patient_id %in% d_pat_loss$patient_id,]$unique_prescription_id
+#lost_treatments=unique(na.omit(setdiff(lost_treatments,lost_treatments_of_lost_patients)))
+
+
+d_lost_treatments=d_old_pre[d_old_pre$unique_prescription_id %in% lost_treatments,]
+print(paste("Total number of lost treatments: ",length(lost_treatments)))
+
+wanted_drug_types=c("BIOLOGIC","DMARD","STEROID")
+variabels=c("drugstartdate","drugstopdate")
+
+for(type in wanted_drug_types){
+  temp_lost_d=d_lost_treatments[d_lost_treatments$drugtype == type,]
+  temp_d=d_old_pre[d_old_pre$drugtype == type,]
+  
+  
+  values<-na.omit(parse_date(temp_d$drugstartdate))
+  values<-values[values>as.Date("1800-01-01")]
+  years=round(time_length(difftime(max(values),min(values)),"years"))+1
+  if(years<1){
+    years=1
+  }
+  HIST<-hist(values,breaks="years",format="%Y-%m",main=paste("old ",type," (amount:",nrow(temp_d),")"),xlab=" ",freq=TRUE,las=2)
+  
+  values<-na.omit(parse_date(temp_lost_d$drugstartdate))
+  values<-values[values>as.Date("1800-01-01")]
+  years=round(time_length(difftime(max(values),min(values)),"years"))+1
+  if(years<1){
+    years=1
+  }
+  HIST<-hist(values,breaks="years",format="%Y-%m",main=paste("lost ",type," (amount: ",nrow(temp_lost_d),")"),xlab=" ",freq=TRUE,las=2)
+  print("=======================================================================================")
+}
+
+```
+
+
+# 13. treatment data on patients common to both dumps with lost treatments
+```{r,eval=TRUE, echo=F}
+ids_in_common=intersect(ids_in_common,filtered_df$patient_id)
+
+d_pre_new_common_sub=d_new_pre[d_new_pre$patient_id %in% ids_in_common,]
+d_pre_old_common_sub=d_old_pre[d_old_pre$patient_id %in% ids_in_common,]
+d_pre_new_common_sub=d_pre_new_common_sub[order(d_pre_new_common_sub$patient_id,d_pre_new_common_sub$drugstartdate),]
+d_pre_old_common_sub=d_pre_old_common_sub[order(d_pre_old_common_sub$patient_id,d_pre_old_common_sub$drugstartdate),]
+
+d_pat_new_common_sub=pat_new[pat_new$patient_id %in% ids_in_common,]
+d_pat_old_common_sub=pat_old[pat_old$patient_id %in% ids_in_common,]
+d_pat_new_common_sub=d_pat_new_common_sub[order(d_pat_new_common_sub$patient_id),]
+d_pat_old_common_sub=d_pat_old_common_sub[order(d_pat_old_common_sub$patient_id),]
+
+for(pid in ids_in_common){
+  print(d_pat_old_common_sub[d_pat_old_common_sub$patient_id==pid,col<-c("patient_id","unique_patient_id","diagnosis","monthyearofdiagnosis")])
+  print(d_pat_new_common_sub[d_pat_new_common_sub$patient_id==pid,col<-c("patient_id","unique_patient_id","diagnosis","monthyearofdiagnosis")])
+  print(d_pre_old_common_sub[d_pre_old_common_sub$patient_id==pid,col<-c("unique_patient_id","drugname","drugstartdate","drugstopdate")])
+  print(d_pre_new_common_sub[d_pre_new_common_sub$patient_id==pid,col<-c("unique_patient_id","drugname","drugstartdate","drugstopdate")])
+  print("##################################################################################################")
+}
+```
+

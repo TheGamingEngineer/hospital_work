@@ -4,11 +4,11 @@ import pandas as pd
 import numpy as np
 import sys
 ## data is the list of paths to the .xlsx files used 
-data=["/Users/AAND0774/Downloads/clinical_data_overview_files_20231003/data_CH_2023-10-03.xlsx",
-      "/Users/AAND0774/Downloads/clinical_data_overview_files_20231003/data_CZ_2023-10-03.xlsx",
-      "/Users/AAND0774/Downloads/clinical_data_overview_files_20231003/data_DK_2023-10-03.xlsx",
-      "/Users/AAND0774/Downloads/clinical_data_overview_files_20231003/data_IS_2023-10-03.xlsx",
-      "/Users/AAND0774/Downloads/clinical_data_overview_files_20231003/data_SI_2023-10-03.xlsx"]
+data=["/Users/AAND0774/Downloads/clinical_data_overview_files_20231110/data_CH_2023-11-09.xlsx",
+      "/Users/AAND0774/Downloads/clinical_data_overview_files_20231110/data_CZ_2023-11-10.xlsx",
+      "/Users/AAND0774/Downloads/clinical_data_overview_files_20231110/data_DK_2023-11-10.xlsx",
+      "/Users/AAND0774/Downloads/clinical_data_overview_files_20231110/data_IS_2023-11-10.xlsx",
+      "/Users/AAND0774/Downloads/clinical_data_overview_files_20231110/data_SI_2023-11-10.xlsx"]
 
 # a few custom functions used to run it.
 def unique(LIST,isolate=False):
